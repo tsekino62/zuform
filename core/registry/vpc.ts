@@ -23,14 +23,19 @@ resource "aws_vpc" "${v}" {
   tags = { Name = "${physical}" }${ctx.extraBlock(node)}
 }
 
-# インターネットへの出入口
+# ${ctx.tr('インターネットへの出入口', 'Gateway to and from the internet')}
 resource "aws_internet_gateway" "${v}_igw" {
   vpc_id = aws_vpc.${v}.id
 
   tags = { Name = "${physical}-igw" }
 }
 
-# パブリックサブネット（インターネットから到達可能）
+# ${
+      ctx.tr(
+        'パブリックサブネット（インターネットから到達可能）',
+        'Public subnet (reachable from the internet)',
+      )
+    }
 resource "aws_subnet" "${v}_public_a" {
   vpc_id                  = aws_vpc.${v}.id
   cidr_block              = "${cidr}.0.0/24"
@@ -40,7 +45,12 @@ resource "aws_subnet" "${v}_public_a" {
   tags = { Name = "${physical}-public-a" }
 }
 
-# プライベートサブネット（DBなど外部公開しないリソース用・2AZ分）
+# ${
+      ctx.tr(
+        'プライベートサブネット（DBなど外部公開しないリソース用・2AZ分）',
+        'Private subnets across two AZs, for resources that stay off the internet (DBs, etc.)',
+      )
+    }
 resource "aws_subnet" "${v}_private_a" {
   vpc_id            = aws_vpc.${v}.id
   cidr_block        = "${cidr}.10.0/24"
@@ -57,7 +67,7 @@ resource "aws_subnet" "${v}_private_c" {
   tags = { Name = "${physical}-private-c" }
 }
 
-# パブリックサブネット用のルートテーブル
+# ${ctx.tr('パブリックサブネット用のルートテーブル', 'Route table for the public subnet')}
 resource "aws_route_table" "${v}_public" {
   vpc_id = aws_vpc.${v}.id
 

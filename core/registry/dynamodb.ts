@@ -9,16 +9,25 @@ export const dynamodbModule: ServiceModule = {
   generate(node, ctx) {
     const n = ctx.name(node);
     return `
-# ---------- DynamoDBテーブル: ${node.data.label} ----------
+# ---------- ${
+      ctx.tr(`DynamoDBテーブル: ${node.data.label}`, `DynamoDB table: ${node.data.label}`)
+    } ----------
 
 resource "aws_dynamodb_table" "${n}" {
   name         = "${ctx.physicalName(node)}"
-  billing_mode = "PAY_PER_REQUEST" # 使った分だけ課金（初心者におすすめ）
-  hash_key     = "id"              # 主キー。必要に応じて変更してください
+  billing_mode = "PAY_PER_REQUEST" # ${
+      ctx.tr(
+        '使った分だけ課金（初心者におすすめ）',
+        'Pay only for what you use (recommended for beginners)',
+      )
+    }
+  hash_key     = "id"              # ${
+      ctx.tr('主キー。必要に応じて変更してください', 'Partition key. Change it if you need to')
+    }
 
   attribute {
     name = "id"
-    type = "S" # S = 文字列型
+    type = "S" # ${ctx.tr('S = 文字列型', 'S = string type')}
   }
 
   tags = { Name = "${ctx.physicalName(node)}" }${ctx.extraBlock(node)}

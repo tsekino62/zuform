@@ -167,3 +167,37 @@ Deno.test('serializeDiagramText(yaml): YAML形式で書き出す（JSONにはな
   assertEquals(text.startsWith('version: 1'), true);
   assertStringIncludes(text, 'layout:');
 });
+
+Deno.test('serializeDiagramText(yaml): previousTextを渡すとコメントを保持したまま直列化する（coreへ委譲）', () => {
+  const previousText = `version: 1
+project: myapp
+naming:
+  pattern: "{project}-{env}-{name}"
+  commonTags: true
+
+resources:
+  lambda-1: # 大事な関数
+    type: lambda
+
+connections: []
+
+layout:
+  lambda-1: [10, 20]
+`;
+  const text = serializeDiagramText(
+    { nodes: [sampleNode()], edges: [], naming: DEFAULT_NAMING },
+    'yaml',
+    previousText,
+  );
+  assertStringIncludes(text, '# 大事な関数');
+});
+
+Deno.test('serializeDiagramText(json): previousTextを渡してもJSON形式では無視される', () => {
+  const text = serializeDiagramText(
+    { nodes: [sampleNode()], edges: [], naming: DEFAULT_NAMING },
+    'json',
+    'this is not used for json',
+  );
+  const parsed = JSON.parse(text);
+  assertEquals(parsed.version, 2);
+});

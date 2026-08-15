@@ -127,10 +127,19 @@ function parseDiagramJson(text: string, uiLang: Lang): ParsedDiagram {
   };
 }
 
-/** 図をドキュメントのテキストへ直列化する（記法はドキュメント側に合わせる） */
-export function serializeDiagramText(model: DiagramModel, language: DocumentLanguage): string {
+/**
+ * 図をドキュメントのテキストへ直列化する（記法はドキュメント側に合わせる）。
+ *
+ * `previousText` を渡すと（YAMLの場合のみ）、そのテキストに差分適用して
+ * コメント・キー順を保持する。省略時・JSON形式では従来どおりの新規生成。
+ */
+export function serializeDiagramText(
+  model: DiagramModel,
+  language: DocumentLanguage,
+  previousText?: string,
+): string {
   if (language === 'yaml') {
-    return serializeArchYaml(model.nodes, model.edges, model.naming);
+    return serializeArchYaml(model.nodes, model.edges, model.naming, previousText);
   }
   const sanitized = sanitizeDiagram({ version: 2, ...model });
   return `${JSON.stringify(sanitized, null, 2)}\n`;
@@ -216,6 +225,14 @@ export function sanitizeDiagram(diagram: DiagramDocument): DiagramDocument {
   };
 }
 
+/**
+ * 拡張から受け取った最後のテキスト（init）、または自分が最後に送ったテキスト
+ * （diagramChanged）。「今ファイルに書かれているはずのテキスト」を追跡し、
+ * YAML(archfile)の差分適用serializeのpreviousTextとして使う。
+ * VSCode内でのみ意味を持つ（ブラウザ単体では常にundefinedのまま）。
+ */
+let lastKnownDocumentText: string | undefined;
+
 const DIAGRAM_CHANGED_DEBOUNCE_MS = 300;
 let debounceTimer: number | undefined;
 
@@ -227,7 +244,9 @@ export function postDiagramChanged(model: DiagramModel, language: DocumentLangua
   if (!isInVsCode()) return;
   globalThis.clearTimeout(debounceTimer);
   debounceTimer = globalThis.setTimeout(() => {
-    post({ type: 'diagramChanged', text: serializeDiagramText(model, language) });
+    const text = serializeDiagramText(model, language, lastKnownDocumentText);
+    lastKnownDocumentText = text;
+    post({ type: 'diagramChanged', text });
   }, DIAGRAM_CHANGED_DEBOUNCE_MS);
 }
 
@@ -244,6 +263,7 @@ export function onInit(
     if (!message || message.type !== 'init') return;
     if (typeof message.text !== 'string') return;
     const language: DocumentLanguage = message.language === 'yaml' ? 'yaml' : 'json';
+    lastKnownDocumentText = message.text;
     handler(message.text, language);
   };
   globalThis.addEventListener('message', listener);

@@ -1,5 +1,8 @@
 import type { Edge, Node } from '@xyflow/react';
 
+/** 生成されるTerraformコード内のコメント・ヒント文の言語 */
+export type Locale = 'ja' | 'en';
+
 export type ServiceType =
   | 'apigateway'
   | 'lambda'
@@ -120,6 +123,14 @@ export interface GenContext {
   nodes: AwsNode[];
   edges: Edge[];
   hints: string[];
+  /** 生成コードのコメント・ヒント文の言語 */
+  locale: Locale;
+  /**
+   * ロケールに応じて日本語／英語のどちらかを返す。
+   * 生成コードの文言はテンプレート文字列と一体で読めるよう、
+   * 辞書ファイルではなく呼び出し箇所にインラインで両言語を書く。
+   */
+  tr(ja: string, en: string): string;
   /** Terraformの論理名（resource "aws_x" "この部分"）。環境に依存しない */
   name(node: AwsNode): string;
   /** 命名規則を適用した物理リソース名。suffixは "-sg" など */

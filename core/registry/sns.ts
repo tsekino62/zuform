@@ -17,7 +17,9 @@ export const snsModule: ServiceModule = {
 
     const parts: string[] = [];
     parts.push(`
-# ---------- SNSトピック: ${node.data.label} ----------
+# ---------- ${
+      ctx.tr(`SNSトピック: ${node.data.label}`, `SNS topic: ${node.data.label}`)
+    } ----------
 
 resource "aws_sns_topic" "${n}" {
   name = "${physical}"
@@ -28,14 +30,19 @@ resource "aws_sns_topic" "${n}" {
     for (const fn of subscribers) {
       const l = ctx.name(fn);
       parts.push(`
-# トピックの通知をLambda「${fn.data.label}」が受け取る
+# ${
+        ctx.tr(
+          `トピックの通知をLambda「${fn.data.label}」が受け取る`,
+          `The Lambda "${fn.data.label}" receives notifications from this topic`,
+        )
+      }
 resource "aws_sns_topic_subscription" "${n}_${l}" {
   topic_arn = aws_sns_topic.${n}.arn
   protocol  = "lambda"
   endpoint  = aws_lambda_function.${l}.arn
 }
 
-# SNSがこのLambdaを呼び出すことを許可
+# ${ctx.tr('SNSがこのLambdaを呼び出すことを許可', 'Allow SNS to invoke this Lambda')}
 resource "aws_lambda_permission" "${n}_${l}" {
   statement_id  = "AllowInvokeFromSNS-${physical}"
   action        = "lambda:InvokeFunction"
@@ -47,7 +54,10 @@ resource "aws_lambda_permission" "${n}_${l}" {
 
     if (subscribers.length === 0) {
       ctx.hints.push(
-        `SNS「${node.data.label}」の通知先がありません。Lambdaへ矢印でつなぐとサブスクリプションが生成されます（メール通知などは生成後にコードへ追記できます）。`,
+        ctx.tr(
+          `SNS「${node.data.label}」の通知先がありません。Lambdaへ矢印でつなぐとサブスクリプションが生成されます（メール通知などは生成後にコードへ追記できます）。`,
+          `The SNS topic "${node.data.label}" has no subscriber. Draw an arrow to a Lambda and a subscription will be generated (email and other protocols can be added to the code afterwards).`,
+        ),
       );
     }
 

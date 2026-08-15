@@ -62,14 +62,38 @@ deno task ext:build
 UIを直したときは、ルートで `deno task build` → 拡張側で `npm run build` を実行し、
 Extension Development Host を再起動してください（`media/` の再コピーが必要です）。
 
-## パッケージング
+## パッケージング（ローカルで .vsix を作る）
 
 ```bash
 npx @vscode/vsce package --no-dependencies
 ```
 
-`publisher` が `local-dev` のためMarketplaceへは公開できません。
-生成された `.vsix` は `code --install-extension zuform-vscode-0.0.1.vsix` でローカルに入れられます。
+生成された `.vsix` は `code --install-extension zuform-vscode-0.1.0.vsix` でローカルに入れられます。
+
+## Marketplace公開（手動手順）
+
+CIワークフロー（`.github/workflows/release-ext.yml`）は用意済みですが、
+以下はリポジトリのオーナーが一度だけ手動で行う必要がある準備作業です。
+
+1. https://marketplace.visualstudio.com/manage で publisher を作成する（Azure DevOpsアカウントが必要）
+2. 作成した publisher ID が `package.json` の `publisher`（現在 `tsekino62`）と異なる場合は、
+   `vscode-ext/package.json` の `publisher` フィールドを実際のIDに合わせて修正する
+3. Azure DevOps の Personal Access Token 画面で、スコープ **Marketplace: Manage** のPATを発行する
+4. GitHubリポジトリの **Settings > Secrets and variables > Actions** に、
+   発行したPATを `VSCE_PAT` という名前のSecretとして登録する
+5. リリースしたいバージョンでタグを打って push する
+
+   ```bash
+   git tag ext-v0.1.0
+   git push --tags
+   ```
+
+   これで `.github/workflows/release-ext.yml` が起動し、ビルド → vsix パッケージ →
+   `vsce publish` によるMarketplace公開まで自動で実行される。
+
+   手動でワークフローを実行（`workflow_dispatch`）した場合はpublishまでは行わず、
+   生成した vsix をワークフローのartifactとしてアップロードするだけの dry-run になる
+   （動作確認用）。
 
 ## メッセージプロトコル
 
@@ -116,4 +140,3 @@ Web側の実装は `../web/src/vscode.ts`、拡張側は `src/messages.ts` に�
 - 書き出し先は最初のワークスペースフォルダ固定です（マルチルートでの選択UIはありません）
 - 右パネルの「⬇ dev.main.tf」など**単体ファイルのダウンロード**はブラウザ向けの機能で、Webview内では動きません。
   VSCodeでは「ワークスペースへ書き出し」を使ってください
-- `publisher: local-dev` かつ `repository` 未設定のため、`vsce package` 実行時に警告が出ます（パッケージ自体は成功します）

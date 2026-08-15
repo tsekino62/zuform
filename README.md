@@ -136,6 +136,8 @@ layout:                 # 図の座標（省略可）。vpcは [x, y, 幅, 高�
 
 YAMLをテキストエディタで直接書き換えるとキャンバスへ即座に反映され、キャンバスで編集するとYAMLが書き換わります（双方向編集）。ビルドとデバッグ手順は [vscode-ext/README.md](vscode-ext/README.md) を参照。
 
+現在は `.vsix` の手動インストールのみ対応です。Marketplace公開はIssue #4で対応中です。
+
 ```bash
 deno task ext:build
 ```

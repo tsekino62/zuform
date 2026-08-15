@@ -1,16 +1,41 @@
 {
   "name": "zuform-vscode",
   "displayName": "Zuform",
-  "description": "AWS構成図を描いてTerraformを生成するカスタムエディタ（プロトタイプ）",
-  "version": "0.0.1",
-  "publisher": "local-dev",
+  "description": "Draw AWS architecture diagrams and generate Terraform for dev/stg/prd — AWS構成図からTerraformを生成",
+  "version": "0.1.0",
+  "publisher": "tsekino62",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tsekino62/zuform.git",
+    "directory": "vscode-ext"
+  },
+  "bugs": {
+    "url": "https://github.com/tsekino62/zuform/issues"
+  },
+  "homepage": "https://github.com/tsekino62/zuform#readme",
+  "icon": "assets/icon.png",
+  "galleryBanner": {
+    "color": "#1b2130",
+    "theme": "dark"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
     "Visualization",
+    "Programming Languages",
     "Other"
+  ],
+  "keywords": [
+    "terraform",
+    "aws",
+    "diagram",
+    "infrastructure as code",
+    "iac",
+    "architecture",
+    "devops",
+    "cloud"
   ],
   "main": "./dist/extension.js",
   "activationEvents": [],

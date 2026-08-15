@@ -7,7 +7,7 @@ import {
   toKebabName,
   toLogicalName,
 } from './generator.ts';
-import { DEFAULT_NAMING } from './types.ts';
+import { DEFAULT_NAMING, ENV_IDS } from './types.ts';
 import type { AwsNode } from './types.ts';
 import { CONNECTION_RULES } from './registry/index.ts';
 import { TEMPLATES } from './templates.ts';
@@ -318,4 +318,123 @@ Deno.test('追加HCL: 未指定なら従来と同一出力（既存スナップ�
   const { code, hints } = generateForEnv(nodes, edges, 'dev', DEFAULT_NAMING);
   assertEquals(hints, []);
   assert(!code.includes('追加設定'));
+});
+
+// ---------- ロケール（生成コードのコメント・ヒント文） ----------
+
+/** 日本語（ひらがな・カタカナ・漢字）が1文字でも含まれるか */
+const JAPANESE = /[ぁ-んァ-ン一-龥]/;
+
+Deno.test('ロケール: 既定はjaで、locale未指定と明示指定の出力が一致する', () => {
+  const { nodes, edges } = tpl('serverless-api');
+  for (const env of ENV_IDS) {
+    const implicit = generateForEnv(nodes, edges, env, DEFAULT_NAMING);
+    const explicit = generateForEnv(nodes, edges, env, DEFAULT_NAMING, 'ja');
+    assertEquals(implicit.code, explicit.code);
+    assertEquals(implicit.hints, explicit.hints);
+  }
+  assertEquals(
+    generateAll(nodes, edges, DEFAULT_NAMING).dev.code,
+    generateAll(nodes, edges, DEFAULT_NAMING, 'ja').dev.code,
+  );
+});
+
+Deno.test('ロケール: en の生成コードに日本語が残らない（代表3テンプレート×全環境）', () => {
+  for (const id of ['serverless-api', 'web-db-api', 'async-worker']) {
+    const { nodes, edges } = tpl(id);
+    for (const env of ENV_IDS) {
+      const { code, hints } = generateForEnv(nodes, edges, env, DEFAULT_NAMING, 'en');
+      const jaLines = code.split('\n').filter((l) => JAPANESE.test(l));
+      assertEquals(jaLines, [], `${id}/${env} に日本語が残っています`);
+      assertEquals(hints.filter((h) => JAPANESE.test(h)), []);
+    }
+  }
+});
+
+Deno.test('ロケール: en では共通部分（ヘッダ・provider・variable）も英語になる', () => {
+  const { nodes, edges } = tpl('web-db-api');
+  const { code } = generateForEnv(nodes, edges, 'dev', DEFAULT_NAMING, 'en');
+  assertStringIncludes(code, '# Environment: DEV');
+  assertStringIncludes(code, 'generated automatically from a diagram built with Zuform');
+  assertStringIncludes(code, 'Automatically apply common tags');
+  assertStringIncludes(code, 'AWS region in which the resources are created');
+  assertStringIncludes(code, '"ap-northeast-1" # Tokyo region');
+  assertStringIncludes(code, 'Master password for the RDS database');
+});
+
+Deno.test('ロケール: en では除外リソースの見出しと空図の案内も英語になる', () => {
+  const { nodes, edges } = tpl('serverless-api');
+  const withEnvs = nodes.map((n) =>
+    n.data.serviceType === 'dynamodb'
+      ? { ...n, data: { ...n.data, envs: ['prd' as const] } }
+      : n
+  );
+  const dev = generateForEnv(withEnvs, edges, 'dev', DEFAULT_NAMING, 'en');
+  assertStringIncludes(dev.code, 'The following resources are excluded from this environment (DEV)');
+
+  const empty = generateForEnv([], [], 'dev', DEFAULT_NAMING, 'en');
+  assert(!JAPANESE.test(empty.code));
+  assertEquals(empty.hints.length, 1);
+  assertStringIncludes(empty.hints[0], 'Drag an icon from the palette');
+});
+
+Deno.test('ロケール: en ではヒント文が英語になる（VPC外のRDS / 未接続のCloudFront）', () => {
+  const rdsOutside: AwsNode[] = [
+    {
+      id: 'rds1',
+      type: 'aws',
+      position: { x: 0, y: 0 },
+      data: { serviceType: 'rds', label: 'lonely-db' },
+    },
+  ];
+  const rdsEn = generateForEnv(rdsOutside, [], 'dev', DEFAULT_NAMING, 'en');
+  assertEquals(rdsEn.hints.length, 1);
+  assert(!JAPANESE.test(rdsEn.hints[0]));
+  assertStringIncludes(rdsEn.hints[0], 'sits outside the VPC boundary');
+  assertStringIncludes(rdsEn.code, 'WARNING: this RDS instance is outside the VPC boundary');
+  // ja（既定）では従来どおり日本語
+  assertStringIncludes(
+    generateForEnv(rdsOutside, [], 'dev', DEFAULT_NAMING).hints[0],
+    'VPCの枠の外にあります',
+  );
+
+  const cdn: AwsNode[] = [
+    {
+      id: 'cf1',
+      type: 'aws',
+      position: { x: 0, y: 0 },
+      data: { serviceType: 'cloudfront', label: 'lonely-cdn' },
+    },
+  ];
+  const cdnEn = generateForEnv(cdn, [], 'dev', DEFAULT_NAMING, 'en');
+  assertEquals(cdnEn.hints.length, 1);
+  assert(!JAPANESE.test(cdnEn.hints[0]));
+  assertStringIncludes(cdnEn.hints[0], 'has no origin');
+});
+
+Deno.test('ロケール: en の追加HCLコメントも英語になる', () => {
+  const nodes: AwsNode[] = [
+    {
+      id: 'fn1',
+      type: 'aws',
+      position: { x: 0, y: 0 },
+      data: { serviceType: 'lambda', label: 'my-fn', extraHcl: 'memory_size = 512' },
+    },
+  ];
+  const { code } = generateForEnv(nodes, [], 'dev', DEFAULT_NAMING, 'en');
+  assertStringIncludes(code, '# --- Extra settings (inserted from "Extra HCL" in the inspector) ---');
+  assert(!JAPANESE.test(code));
+});
+
+Deno.test('サーバーレスAPIテンプレート(dev/en)のスナップショット', async (t) => {
+  const { nodes, edges } = tpl('serverless-api');
+  const { code, hints } = generateForEnv(nodes, edges, 'dev', DEFAULT_NAMING, 'en');
+  assertEquals(hints, []);
+  await assertSnapshot(t, code);
+});
+
+Deno.test('RDB構成テンプレート(prd/en)のスナップショット', async (t) => {
+  const { nodes, edges } = tpl('web-db-api');
+  const { code } = generateForEnv(nodes, edges, 'prd', DEFAULT_NAMING, 'en');
+  await assertSnapshot(t, code);
 });

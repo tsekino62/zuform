@@ -29,7 +29,10 @@ export const lambdaModule: ServiceModule = {
 
     if (vpc && !ctx.parentVpc(node)) {
       ctx.hints.push(
-        `Lambda「${node.data.label}」はRDSに接続しているため、自動的にVPC「${vpc.data.label}」内で動作する設定を追加しました。図の上でもVPCの枠内に配置すると、構成がより分かりやすくなります。`,
+        ctx.tr(
+          `Lambda「${node.data.label}」はRDSに接続しているため、自動的にVPC「${vpc.data.label}」内で動作する設定を追加しました。図の上でもVPCの枠内に配置すると、構成がより分かりやすくなります。`,
+          `Because the Lambda "${node.data.label}" connects to an RDS instance, VPC configuration for "${vpc.data.label}" was added automatically. Placing it inside the VPC boundary on the diagram too makes the architecture easier to read.`,
+        ),
       );
     }
     const rdsOutsideVpc = rdsTargets.filter((r) => !ctx.parentVpc(r));
@@ -60,15 +63,27 @@ export const lambdaModule: ServiceModule = {
         envLines.push(`      DB_NAME     = aws_db_instance.${tn}.db_name`);
         envLines.push(`      DB_USER     = aws_db_instance.${tn}.username`);
         envLines.push(
-          `      DB_PASSWORD = var.db_password # 本番ではSecrets Managerの利用を推奨`,
+          `      DB_PASSWORD = var.db_password # ${
+            ctx.tr(
+              '本番ではSecrets Managerの利用を推奨',
+              'Use Secrets Manager in production',
+            )
+          }`,
         );
       });
 
     const parts: string[] = [];
     parts.push(`
-# ---------- Lambda関数: ${node.data.label} ----------
+# ---------- ${
+      ctx.tr(`Lambda関数: ${node.data.label}`, `Lambda function: ${node.data.label}`)
+    } ----------
 
-# Lambdaが実行時に使うIAMロール（権限のセット）
+# ${
+      ctx.tr(
+        'Lambdaが実行時に使うIAMロール（権限のセット）',
+        'IAM role (the set of permissions) the Lambda assumes at runtime',
+      )
+    }
 resource "aws_iam_role" "${n}_role" {
   name = "${physical}-role"
 
@@ -82,7 +97,12 @@ resource "aws_iam_role" "${n}_role" {
   })
 }
 
-# CloudWatch Logsへログを書き込む基本権限
+# ${
+      ctx.tr(
+        'CloudWatch Logsへログを書き込む基本権限',
+        'Basic permission to write logs to CloudWatch Logs',
+      )
+    }
 resource "aws_iam_role_policy_attachment" "${n}_basic" {
   role       = aws_iam_role.${n}_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
@@ -90,13 +110,15 @@ resource "aws_iam_role_policy_attachment" "${n}_basic" {
 
     if (v) {
       parts.push(`
-# VPC内で動作するための権限
+# ${
+        ctx.tr('VPC内で動作するための権限', 'Permission required to run inside a VPC')
+      }
 resource "aws_iam_role_policy_attachment" "${n}_vpc" {
   role       = aws_iam_role.${n}_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
-# Lambda用のセキュリティグループ
+# ${ctx.tr('Lambda用のセキュリティグループ', 'Security group for the Lambda')}
 resource "aws_security_group" "${n}_sg" {
   name   = "${physical}-sg"
   vpc_id = aws_vpc.${v}.id
@@ -115,7 +137,12 @@ resource "aws_security_group" "${n}_sg" {
     for (const t of dynamoTargets) {
       const tn = ctx.name(t);
       parts.push(`
-# DynamoDBテーブル「${t.data.label}」への読み書き権限
+# ${
+        ctx.tr(
+          `DynamoDBテーブル「${t.data.label}」への読み書き権限`,
+          `Read/write permission on the DynamoDB table "${t.data.label}"`,
+        )
+      }
 resource "aws_iam_role_policy" "${n}_${tn}_access" {
   name = "${physical}-${tn.replace(/_/g, '-')}-access"
   role = aws_iam_role.${n}_role.id
@@ -141,7 +168,12 @@ resource "aws_iam_role_policy" "${n}_${tn}_access" {
     for (const t of s3Targets) {
       const tn = ctx.name(t);
       parts.push(`
-# S3バケット「${t.data.label}」への読み書き権限
+# ${
+        ctx.tr(
+          `S3バケット「${t.data.label}」への読み書き権限`,
+          `Read/write permission on the S3 bucket "${t.data.label}"`,
+        )
+      }
 resource "aws_iam_role_policy" "${n}_${tn}_access" {
   name = "${physical}-${tn.replace(/_/g, '-')}-access"
   role = aws_iam_role.${n}_role.id
@@ -168,7 +200,12 @@ resource "aws_iam_role_policy" "${n}_${tn}_access" {
     for (const t of sqsTargets) {
       const tn = ctx.name(t);
       parts.push(`
-# SQSキュー「${t.data.label}」へメッセージを送る権限
+# ${
+        ctx.tr(
+          `SQSキュー「${t.data.label}」へメッセージを送る権限`,
+          `Permission to send messages to the SQS queue "${t.data.label}"`,
+        )
+      }
 resource "aws_iam_role_policy" "${n}_${tn}_send" {
   name = "${physical}-${tn.replace(/_/g, '-')}-send"
   role = aws_iam_role.${n}_role.id
@@ -187,7 +224,12 @@ resource "aws_iam_role_policy" "${n}_${tn}_send" {
     for (const t of snsTargets) {
       const tn = ctx.name(t);
       parts.push(`
-# SNSトピック「${t.data.label}」へ通知を発行する権限
+# ${
+        ctx.tr(
+          `SNSトピック「${t.data.label}」へ通知を発行する権限`,
+          `Permission to publish notifications to the SNS topic "${t.data.label}"`,
+        )
+      }
 resource "aws_iam_role_policy" "${n}_${tn}_publish" {
   name = "${physical}-${tn.replace(/_/g, '-')}-publish"
   role = aws_iam_role.${n}_role.id
@@ -206,7 +248,12 @@ resource "aws_iam_role_policy" "${n}_${tn}_publish" {
     for (const t of sqsSources) {
       const tn = ctx.name(t);
       parts.push(`
-# SQSキュー「${t.data.label}」からメッセージを受け取る権限（イベントソース用）
+# ${
+        ctx.tr(
+          `SQSキュー「${t.data.label}」からメッセージを受け取る権限（イベントソース用）`,
+          `Permission to receive messages from the SQS queue "${t.data.label}" (for the event source mapping)`,
+        )
+      }
 resource "aws_iam_role_policy" "${n}_${tn}_consume" {
   name = "${physical}-${tn.replace(/_/g, '-')}-consume"
   role = aws_iam_role.${n}_role.id
@@ -230,7 +277,12 @@ resource "aws_iam_role_policy" "${n}_${tn}_consume" {
       envLines.length > 0
         ? `
 
-  # 接続先の情報を環境変数としてLambdaのコードに渡す
+  # ${
+      ctx.tr(
+        '接続先の情報を環境変数としてLambdaのコードに渡す',
+        'Pass connection details to the Lambda code as environment variables',
+      )
+    }
   environment {
     variables = {
 ${envLines.join('\n')}
@@ -241,7 +293,12 @@ ${envLines.join('\n')}
     const vpcBlock = v
       ? `
 
-  # VPC内のリソース（RDSなど）へアクセスするための設定
+  # ${
+      ctx.tr(
+        'VPC内のリソース（RDSなど）へアクセスするための設定',
+        'Configuration needed to reach resources inside the VPC (RDS, etc.)',
+      )
+    }
   vpc_config {
     subnet_ids         = [aws_subnet.${v}_private_a.id, aws_subnet.${v}_private_c.id]
     security_group_ids = [aws_security_group.${n}_sg.id]
@@ -254,19 +311,37 @@ resource "aws_lambda_function" "${n}" {
   role          = aws_iam_role.${n}_role.arn
 
   runtime = "python3.12"
-  handler = "index.lambda_handler" # index.py の lambda_handler 関数を実行
+  handler = "index.lambda_handler" # ${
+      ctx.tr(
+        'index.py の lambda_handler 関数を実行',
+        'Runs the lambda_handler function in index.py',
+      )
+    }
 
-  # ここにデプロイパッケージ(zip)を配置してください。
-  # 例: mkdir -p build && cd src && zip -r ../build/${n}.zip .
+  # ${
+      ctx.tr(
+        `ここにデプロイパッケージ(zip)を配置してください。
+  # 例: mkdir -p build && cd src && zip -r ../build/${n}.zip .`,
+        `Place the deployment package (zip) here.
+  # Example: mkdir -p build && cd src && zip -r ../build/${n}.zip .`,
+      )
+    }
   filename = "build/${n}.zip"
 
   timeout = 10${envBlock}${vpcBlock}${ctx.extraBlock(node)}
 }`);
 
     if (rdsOutsideVpc.length > 0) {
+      const labels = rdsOutsideVpc.map((r) => r.data.label).join(', ');
       parts.push(`
-# ⚠ 接続先のRDS（${rdsOutsideVpc.map((r) => r.data.label).join(', ')}）がVPC外に
-#   配置されているため、RDSへの接続設定は生成されていません。
+${
+        ctx.tr(
+          `# ⚠ 接続先のRDS（${labels}）がVPC外に
+#   配置されているため、RDSへの接続設定は生成されていません。`,
+          `# WARNING: the target RDS instances (${labels}) are placed outside the VPC,
+#   so no RDS connection settings were generated.`,
+        )
+      }
 `);
     }
 

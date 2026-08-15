@@ -163,6 +163,13 @@ function FlowEditor() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { screenToFlowPosition, getInternalNode, fitView } = useReactFlow<AwsNode, Edge>();
 
+  /**
+   * Web版（ブラウザ単体）で直前に「図を開く」/「図を保存」したYAML(archfile)の
+   * 生テキスト。保存時にこれをpreviousTextとして渡すことで、コメントを保持する。
+   * 新規作成時（一度も開いていない）はundefinedのまま = 従来どおりの新規生成。
+   */
+  const openedYamlTextRef = useRef<string | undefined>(undefined);
+
   /** 拡張からの init を反映している最中か（反映直後の変更通知を1回だけ抑止する） */
   const skipNextChangeRef = useRef(false);
   /** 拡張から init を受け取り済みか（受け取る前に空の図を送り返さないためのガード） */
@@ -475,7 +482,9 @@ function FlowEditor() {
 
   /** 図をアーキテクチャ定義ファイル（*.awsarch.yaml）として書き出す */
   const saveDiagram = useCallback(() => {
-    const text = serializeDiagramText({ nodes, edges, naming }, 'yaml');
+    const text = serializeDiagramText({ nodes, edges, naming }, 'yaml', openedYamlTextRef.current);
+    // 保存したテキストを次回保存時のpreviousTextにする（コメントを保ち続けられるように）
+    openedYamlTextRef.current = text;
     const blob = new Blob([text], { type: 'application/yaml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -493,11 +502,14 @@ function FlowEditor() {
       const reader = new FileReader();
       reader.onload = () => {
         const text = String(reader.result);
+        const language = detectLanguage(file.name, text);
         try {
-          const parsed = parseDiagramText(text, detectLanguage(file.name, text), lang);
+          const parsed = parseDiagramText(text, language, lang);
           setNodes(sortParentsFirst(parsed.nodes));
           setEdges(parsed.edges.map((edge) => ({ ...defaultEdgeOptions, ...edge })));
           setNaming({ ...DEFAULT_NAMING, ...parsed.naming });
+          // 開いた元テキストを保持する（YAMLのみ。次回保存時にコメント保持のpreviousTextとして使う）
+          openedYamlTextRef.current = language === 'yaml' ? text : undefined;
           showToast(
             parsed.warnings.length > 0
               ? warningSummary(parsed.warnings, t)

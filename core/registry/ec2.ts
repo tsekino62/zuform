@@ -16,14 +16,22 @@ export const ec2Module: ServiceModule = {
     const vpc = ctx.parentVpc(node);
     if (!vpc) {
       ctx.hints.push(
-        `EC2「${node.data.label}」はVPCの枠の中に配置するのがおすすめです（現在はデフォルトVPCに作成されます）。`,
+        ctx.tr(
+          `EC2「${node.data.label}」はVPCの枠の中に配置するのがおすすめです（現在はデフォルトVPCに作成されます）。`,
+          `We recommend placing the EC2 instance "${node.data.label}" inside a VPC boundary (it is currently created in the default VPC).`,
+        ),
       );
     }
     const v = vpc ? ctx.name(vpc) : undefined;
     return `
 # ---------- EC2: ${node.data.label} ----------
 
-# 最新の Amazon Linux 2023 のイメージを自動で取得
+# ${
+      ctx.tr(
+        '最新の Amazon Linux 2023 のイメージを自動で取得',
+        'Look up the latest Amazon Linux 2023 image automatically',
+      )
+    }
 data "aws_ami" "${n}_al2023" {
   most_recent = true
   owners      = ["amazon"]
@@ -37,7 +45,12 @@ data "aws_ami" "${n}_al2023" {
 resource "aws_security_group" "${n}_sg" {
   name   = "${physical}-sg"${v ? `\n  vpc_id = aws_vpc.${v}.id` : ''}
 
-  # ⚠ SSH(22番)を全世界に開放しています。実運用では自分のIPに絞ってください
+  # ${
+      ctx.tr(
+        '⚠ SSH(22番)を全世界に開放しています。実運用では自分のIPに絞ってください',
+        'WARNING: SSH (port 22) is open to the whole internet. Restrict it to your own IP in production',
+      )
+    }
   ingress {
     from_port   = 22
     to_port     = 22
@@ -70,7 +83,9 @@ resource "aws_instance" "${n}" {
     const n = ctx.name(node);
     return `
 output "${n}_public_ip" {
-  description = "${node.data.label} のパブリックIPアドレス"
+  description = "${
+      ctx.tr(`${node.data.label} のパブリックIPアドレス`, `Public IP address of ${node.data.label}`)
+    }"
   value       = aws_instance.${n}.public_ip
 }`;
   },

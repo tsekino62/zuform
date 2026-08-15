@@ -1,5 +1,16 @@
 import dagre from '@dagrejs/dagre';
-import { parse as parseYaml, YAMLParseError } from 'yaml';
+import {
+  Document,
+  isMap,
+  isScalar,
+  isSeq,
+  parse as parseYaml,
+  parseDocument,
+  Scalar,
+  YAMLMap,
+  YAMLParseError,
+  YAMLSeq,
+} from 'yaml';
 import type { Edge } from '@xyflow/react';
 import type { AwsNode, AwsNodeData, EnvId, NamingConfig, ServiceType } from './types.ts';
 import { DEFAULT_NAMING, ENV_IDS } from './types.ts';
@@ -489,12 +500,42 @@ function absolutePosition(node: AwsNode, byId: Map<string, AwsNode>): Point {
   return { x: parentAbs.x + node.position.x, y: parentAbs.y + node.position.y };
 }
 
-/** 内部モデル → YAMLテキスト（安定した順序で出力。差分が意味を持つように） */
-export function serializeArchYaml(
-  nodes: AwsNode[],
-  edges: Edge[],
-  naming: NamingConfig,
-): string {
+// ---------- serialize: 内部モデル → YAMLテキストの共通データ組み立て ----------
+
+/** serialize時の1リソース分の内容（labelは重複解消済みの一意な値） */
+interface SerializeResourceEntry {
+  label: string;
+  type: ServiceType;
+  in?: string;
+  envs?: EnvId[];
+  extraHcl?: string;
+}
+
+/** serialize時の1接続分の内容 */
+interface SerializeConnectionEntry {
+  from: string;
+  to: string;
+}
+
+/** serialize時の1レイアウトエントリ（vpcは[x,y,w,h]、それ以外は[x,y]） */
+interface SerializeLayoutEntry {
+  label: string;
+  values: number[];
+}
+
+/** 新規生成モードと差分適用モードの両方から使う、直列化対象の共通データ */
+interface SerializeModel {
+  resources: SerializeResourceEntry[];
+  connections: SerializeConnectionEntry[];
+  layout: SerializeLayoutEntry[];
+}
+
+/**
+ * ノード/エッジから直列化用の中間データを組み立てる。
+ * label重複の一意化・vpc優先順・親からの絶対座標変換など、
+ * 新規生成／差分適用の両モードで共通のロジックをここに集約する。
+ */
+function buildSerializeModel(nodes: AwsNode[], edges: Edge[]): SerializeModel {
   // vpcノードを先頭に（元の相対順序は維持）
   const ordered = [...nodes].sort((a, b) => {
     const av = a.data.serviceType === 'vpc' ? 0 : 1;
@@ -518,47 +559,20 @@ export function serializeArchYaml(
 
   const byId = new Map(nodes.map((n) => [n.id, n]));
 
-  const lines: string[] = [];
-  lines.push('version: 1');
-  lines.push(`project: ${yamlScalar(naming.project)}`);
-  lines.push('naming:');
-  lines.push(`  pattern: ${yamlScalar(naming.pattern)}`);
-  lines.push(`  commonTags: ${naming.commonTags}`);
-  lines.push('');
+  const resources: SerializeResourceEntry[] = ordered.map((n) => ({
+    label: idToLabel.get(n.id)!,
+    type: n.data.serviceType,
+    in: n.parentId ? idToLabel.get(n.parentId) : undefined,
+    envs: n.data.envs && n.data.envs.length > 0 ? n.data.envs : undefined,
+    extraHcl: n.data.extraHcl && n.data.extraHcl.trim() !== '' ? n.data.extraHcl : undefined,
+  }));
 
-  lines.push('resources:');
-  for (const n of ordered) {
-    const label = idToLabel.get(n.id)!;
-    lines.push(`  ${yamlScalar(label)}:`);
-    lines.push(`    type: ${n.data.serviceType}`);
-    if (n.parentId) {
-      const parentLabel = idToLabel.get(n.parentId);
-      if (parentLabel) lines.push(`    in: ${yamlScalar(parentLabel)}`);
-    }
-    if (n.data.envs && n.data.envs.length > 0) {
-      lines.push(`    envs: [${n.data.envs.join(', ')}]`);
-    }
-    if (n.data.extraHcl && n.data.extraHcl.trim() !== '') {
-      lines.push('    extra_hcl: |');
-      for (const rawLine of n.data.extraHcl.split('\n')) {
-        lines.push(rawLine === '' ? '' : `      ${rawLine}`);
-      }
-    }
-  }
-  lines.push('');
+  const connections: SerializeConnectionEntry[] = edges.map((e) => ({
+    from: idToLabel.get(e.source) ?? e.source,
+    to: idToLabel.get(e.target) ?? e.target,
+  }));
 
-  lines.push('connections:');
-  for (const e of edges) {
-    const fromLabel = idToLabel.get(e.source) ?? e.source;
-    const toLabel = idToLabel.get(e.target) ?? e.target;
-    const bothSafe = isSafePlainScalar(fromLabel) && isSafePlainScalar(toLabel);
-    const connStr = `${fromLabel} -> ${toLabel}`;
-    lines.push(`  - ${bothSafe ? connStr : JSON.stringify(connStr)}`);
-  }
-  lines.push('');
-
-  lines.push('layout:');
-  for (const n of ordered) {
+  const layout: SerializeLayoutEntry[] = ordered.map((n) => {
     const label = idToLabel.get(n.id)!;
     const abs = absolutePosition(n, byId);
     const x = Math.round(abs.x);
@@ -570,11 +584,325 @@ export function serializeArchYaml(
       const height = Math.round(
         typeof n.style?.height === 'number' ? n.style.height : DEFAULT_VPC_HEIGHT,
       );
-      lines.push(`  ${yamlScalar(label)}: [${x}, ${y}, ${width}, ${height}]`);
-    } else {
-      lines.push(`  ${yamlScalar(label)}: [${x}, ${y}]`);
+      return { label, values: [x, y, width, height] };
     }
+    return { label, values: [x, y] };
+  });
+
+  return { resources, connections, layout };
+}
+
+/** 内部モデル → YAMLテキストを新規に手組みする（従来どおりの安定した出力） */
+function serializeArchYamlFresh(nodes: AwsNode[], edges: Edge[], naming: NamingConfig): string {
+  const model = buildSerializeModel(nodes, edges);
+
+  const lines: string[] = [];
+  lines.push('version: 1');
+  lines.push(`project: ${yamlScalar(naming.project)}`);
+  lines.push('naming:');
+  lines.push(`  pattern: ${yamlScalar(naming.pattern)}`);
+  lines.push(`  commonTags: ${naming.commonTags}`);
+  lines.push('');
+
+  lines.push('resources:');
+  for (const r of model.resources) {
+    lines.push(`  ${yamlScalar(r.label)}:`);
+    lines.push(`    type: ${r.type}`);
+    if (r.in) lines.push(`    in: ${yamlScalar(r.in)}`);
+    if (r.envs) lines.push(`    envs: [${r.envs.join(', ')}]`);
+    if (r.extraHcl) {
+      lines.push('    extra_hcl: |');
+      for (const rawLine of r.extraHcl.split('\n')) {
+        lines.push(rawLine === '' ? '' : `      ${rawLine}`);
+      }
+    }
+  }
+  lines.push('');
+
+  lines.push('connections:');
+  for (const c of model.connections) {
+    const bothSafe = isSafePlainScalar(c.from) && isSafePlainScalar(c.to);
+    const connStr = `${c.from} -> ${c.to}`;
+    lines.push(`  - ${bothSafe ? connStr : JSON.stringify(connStr)}`);
+  }
+  lines.push('');
+
+  lines.push('layout:');
+  for (const l of model.layout) {
+    lines.push(`  ${yamlScalar(l.label)}: [${l.values.join(', ')}]`);
   }
 
   return lines.join('\n') + '\n';
+}
+
+// ---------- serialize: 差分適用モード（previousText由来のコメント等を保持する） ----------
+
+/** マップのキーをJSの文字列として取り出す（Scalarキー・プレーン値のどちらでも動くように） */
+function scalarKeyToString(key: unknown): string {
+  return isScalar(key) ? String(key.value) : String(key);
+}
+
+/** 親マップのkeyが既存のYAMLMapならそれを返し、無ければ新規マップを作って差し込む */
+function getOrCreateMap(parent: YAMLMap, key: string): YAMLMap {
+  const existing = parent.get(key, true);
+  if (isMap(existing)) return existing as YAMLMap;
+  const created = new YAMLMap();
+  parent.set(key, created);
+  return created;
+}
+
+/** シーケンス（配列）ノードをJSの配列として読む。スカラー配列以外・未指定はundefined */
+function readSeqValues(doc: Document, path: string[]): unknown[] | undefined {
+  const node = doc.getIn(path);
+  if (node === undefined) return undefined;
+  if (!isSeq(node)) return undefined;
+  return node.items.map((it) => (isScalar(it) ? it.value : it));
+}
+
+function arraysEqual(a: unknown[] | undefined, b: readonly unknown[]): boolean {
+  if (a === undefined) return false;
+  if (a.length !== b.length) return false;
+  return a.every((v, i) => v === b[i]);
+}
+
+/** flowスタイル（`[a, b]`のような一行表記）のシーケンスノードを作る */
+function createFlowSeq<T extends string | number>(values: readonly T[]): YAMLSeq {
+  const seq = new YAMLSeq();
+  seq.flow = true;
+  for (const v of values) seq.items.push(new Scalar(v));
+  return seq;
+}
+
+/** ブロックリテラル（`|`）スタイルの文字列スカラーノードを作る（extra_hcl用） */
+function createBlockLiteralScalar(text: string): Scalar {
+  const scalar = new Scalar(text);
+  scalar.type = Scalar.BLOCK_LITERAL;
+  return scalar;
+}
+
+/** 新規リソース用のYAMLMapを組み立てる（type→in→envs→extra_hclの順） */
+function buildResourceNode(entry: SerializeResourceEntry): YAMLMap {
+  const map = new YAMLMap();
+  map.set('type', entry.type);
+  if (entry.in !== undefined) map.set('in', entry.in);
+  if (entry.envs !== undefined) map.set('envs', createFlowSeq(entry.envs));
+  if (entry.extraHcl !== undefined) map.set('extra_hcl', createBlockLiteralScalar(entry.extraHcl));
+  return map;
+}
+
+/** 既存リソースの中身を、変わったフィールドだけ更新する（同じ値は触らずコメント等を保つ） */
+function patchResourceFields(doc: Document, entry: SerializeResourceEntry): void {
+  const path = ['resources', entry.label];
+
+  if (doc.getIn([...path, 'type']) !== entry.type) {
+    doc.setIn([...path, 'type'], entry.type);
+  }
+
+  const currentIn = doc.getIn([...path, 'in']);
+  if (entry.in === undefined) {
+    if (currentIn !== undefined) doc.deleteIn([...path, 'in']);
+  } else if (currentIn !== entry.in) {
+    doc.setIn([...path, 'in'], entry.in);
+  }
+
+  const currentEnvs = readSeqValues(doc, [...path, 'envs']);
+  if (entry.envs === undefined) {
+    if (currentEnvs !== undefined) doc.deleteIn([...path, 'envs']);
+  } else if (!arraysEqual(currentEnvs, entry.envs)) {
+    doc.setIn([...path, 'envs'], createFlowSeq(entry.envs));
+  }
+
+  const currentExtraHcl = doc.getIn([...path, 'extra_hcl']);
+  if (entry.extraHcl === undefined) {
+    if (currentExtraHcl !== undefined) doc.deleteIn([...path, 'extra_hcl']);
+  } else if (currentExtraHcl !== entry.extraHcl) {
+    doc.setIn([...path, 'extra_hcl'], createBlockLiteralScalar(entry.extraHcl));
+  }
+}
+
+/**
+ * resources を差分適用する。
+ * 残っているキーは中身だけ更新（未変更フィールドは触らない）、
+ * 消えたキーは削除、新規キーは末尾に追加する。リネームは削除＋追加として扱う。
+ */
+function patchResources(doc: Document, resources: SerializeResourceEntry[]): void {
+  const resourcesNode = getOrCreateMap(doc.contents as YAMLMap, 'resources');
+  const targetLabels = new Set(resources.map((r) => r.label));
+
+  for (const pair of [...resourcesNode.items]) {
+    if (!targetLabels.has(scalarKeyToString(pair.key))) resourcesNode.delete(pair.key);
+  }
+
+  for (const entry of resources) {
+    if (resourcesNode.has(entry.label)) {
+      patchResourceFields(doc, entry);
+    } else {
+      resourcesNode.set(entry.label, buildResourceNode(entry));
+    }
+  }
+}
+
+/** "from -> to" 形式の接続文字列を組み立てる */
+function connectionText(from: string, to: string): string {
+  return `${from} -> ${to}`;
+}
+
+const CONNECTION_LINE_RE = /^\s*(\S+)\s*->\s*(\S+)\s*$/;
+
+/**
+ * connections を差分適用する。内容（順序含む）が完全に一致していれば触らない。
+ * 変わっている場合は配列を作り直すが、"a -> b" の内容が一致する既存アイテムは
+ * 再利用するため、該当行の行コメントはできるだけ保たれる。
+ */
+function patchConnections(doc: Document, connections: SerializeConnectionEntry[]): void {
+  const targetKeys = connections.map((c) => connectionText(c.from, c.to));
+
+  const existingNode = doc.getIn(['connections']);
+  const existingItems = isSeq(existingNode) ? existingNode.items : [];
+  const existingKeys = existingItems.map((item) => {
+    const raw = isScalar(item) ? String(item.value) : String(item);
+    const match = raw.match(CONNECTION_LINE_RE);
+    return match ? connectionText(match[1], match[2]) : raw;
+  });
+
+  const unchanged = existingKeys.length === targetKeys.length &&
+    existingKeys.every((k, i) => k === targetKeys[i]);
+  if (unchanged) return;
+
+  const pool = new Map<string, unknown[]>();
+  existingItems.forEach((item, i) => {
+    const key = existingKeys[i];
+    const list = pool.get(key) ?? [];
+    list.push(item);
+    pool.set(key, list);
+  });
+
+  const newSeq = new YAMLSeq();
+  for (const key of targetKeys) {
+    const reused = pool.get(key)?.shift();
+    newSeq.items.push(reused ?? key);
+  }
+  doc.set('connections', newSeq);
+}
+
+/**
+ * layout を差分適用する。座標は編集のたびにほぼ必ず変わるため、
+ * ラベルごとに値を比較し、変わっていれば `doc.setIn` で更新する。
+ * 消えたリソースのlayoutエントリは合わせて削除する。
+ */
+function patchLayout(doc: Document, layout: SerializeLayoutEntry[]): void {
+  const rootMap = doc.contents as YAMLMap;
+  const existing = rootMap.get('layout', true);
+  const layoutNode = isMap(existing) ? (existing as YAMLMap) : undefined;
+
+  if (layout.length === 0) {
+    if (layoutNode) {
+      for (const pair of [...layoutNode.items]) layoutNode.delete(pair.key);
+    }
+    return;
+  }
+
+  const map = layoutNode ?? getOrCreateMap(rootMap, 'layout');
+  const targetLabels = new Set(layout.map((l) => l.label));
+
+  for (const pair of [...map.items]) {
+    if (!targetLabels.has(scalarKeyToString(pair.key))) map.delete(pair.key);
+  }
+
+  for (const entry of layout) {
+    const current = readSeqValues(doc, ['layout', entry.label]);
+    if (!arraysEqual(current, entry.values)) {
+      doc.setIn(['layout', entry.label], createFlowSeq(entry.values));
+    }
+  }
+}
+
+/** version / project / naming を、値が変わっている場合だけ更新する */
+function patchTopLevelScalars(doc: Document, naming: NamingConfig): void {
+  if (doc.get('version') !== 1) {
+    doc.set('version', 1);
+  }
+
+  const currentProject = doc.has('project') ? doc.get('project') : DEFAULT_NAMING.project;
+  if (currentProject !== naming.project) {
+    doc.set('project', naming.project);
+  }
+
+  const currentPattern = doc.hasIn(['naming', 'pattern'])
+    ? doc.getIn(['naming', 'pattern'])
+    : DEFAULT_NAMING.pattern;
+  if (currentPattern !== naming.pattern) {
+    doc.setIn(['naming', 'pattern'], naming.pattern);
+  }
+
+  const currentCommonTags = doc.hasIn(['naming', 'commonTags'])
+    ? doc.getIn(['naming', 'commonTags'])
+    : DEFAULT_NAMING.commonTags;
+  if (currentCommonTags !== naming.commonTags) {
+    doc.setIn(['naming', 'commonTags'], naming.commonTags);
+  }
+}
+
+/**
+ * previousText（直前のドキュメント本文）に差分を適用してYAMLを組み立てる。
+ * previousTextが有効なarchfileとしてパースできない場合はnullを返す
+ * （呼び出し側で新規生成にフォールバックすること）。
+ */
+function tryPatchArchYaml(
+  nodes: AwsNode[],
+  edges: Edge[],
+  naming: NamingConfig,
+  previousText: string,
+): string | null {
+  if (previousText.trim() === '') return null;
+
+  try {
+    // previousTextが致命的な問題のないarchfileであることの検証のみに使う
+    parseArchYaml(previousText);
+  } catch {
+    return null;
+  }
+
+  let doc: Document;
+  try {
+    doc = parseDocument(previousText);
+  } catch {
+    return null;
+  }
+  if (doc.errors.length > 0 || !isMap(doc.contents)) return null;
+
+  const model = buildSerializeModel(nodes, edges);
+  patchTopLevelScalars(doc, naming);
+  patchResources(doc, model.resources);
+  patchConnections(doc, model.connections);
+  patchLayout(doc, model.layout);
+
+  // flowCollectionPadding: yaml側の既定(true)だと envs/layout の `[a, b]` が
+  // `[ a, b ]` に変わってしまい、触っていない箇所まで差分が生じる。falseにして
+  // 手組み生成（serializeArchYamlFresh）の書式に近づける
+  return doc.toString({ flowCollectionPadding: false });
+}
+
+/**
+ * 内部モデル → YAMLテキスト（安定した順序で出力。差分が意味を持つように）。
+ *
+ * `previousText` を渡すと、そのテキストへ差分適用してコメント・キー順・
+ * 引用符スタイルを可能な限り保持する（yamlパッケージのDocument API使用）。
+ * 省略した場合、および previousText が有効なarchfileとしてパースできない
+ * 場合は、従来どおりの新規生成にフォールバックする（例外は投げない）。
+ *
+ * 既知の制限: リソースのリネームは「削除＋追加」として扱われ、
+ * そのリソースに付いていたコメントは失われる。
+ */
+export function serializeArchYaml(
+  nodes: AwsNode[],
+  edges: Edge[],
+  naming: NamingConfig,
+  previousText?: string,
+): string {
+  if (previousText !== undefined) {
+    const patched = tryPatchArchYaml(nodes, edges, naming, previousText);
+    if (patched !== null) return patched;
+  }
+  return serializeArchYamlFresh(nodes, edges, naming);
 }

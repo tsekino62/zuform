@@ -453,3 +453,457 @@ output "user_api_endpoint" {
 }
 '
 `;
+
+snapshot[`サーバーレスAPIテンプレート(dev/en)のスナップショット 1`] = `
+'# ============================================================
+# Environment: DEV
+# This file was generated automatically from a diagram built with Zuform
+# How to run (from this environment directory):
+#   terraform init   - First time only. Downloads the provider plugins
+#   terraform plan   - Preview what will be created
+#   terraform apply  - Actually create the resources in AWS
+#   terraform destroy - Delete every resource that was created
+# ============================================================
+
+terraform {
+  required_version = ">= 1.5"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.region
+
+  # Automatically apply common tags to every resource in this file
+  default_tags {
+    tags = {
+      Project     = "myapp"
+      Environment = "dev"
+      ManagedBy   = "terraform"
+    }
+  }
+}
+
+variable "region" {
+  description = "AWS region in which the resources are created"
+  type        = string
+  default     = "ap-northeast-1" # Tokyo region
+}
+
+# ---------- DynamoDB table: items-table ----------
+
+resource "aws_dynamodb_table" "items_table" {
+  name         = "myapp-dev-items-table"
+  billing_mode = "PAY_PER_REQUEST" # Pay only for what you use (recommended for beginners)
+  hash_key     = "id"              # Partition key. Change it if you need to
+
+  attribute {
+    name = "id"
+    type = "S" # S = string type
+  }
+
+  tags = { Name = "myapp-dev-items-table" }
+}
+
+# ---------- Lambda function: items-handler ----------
+
+# IAM role (the set of permissions) the Lambda assumes at runtime
+resource "aws_iam_role" "items_handler_role" {
+  name = "myapp-dev-items-handler-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = "sts:AssumeRole"
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
+  })
+}
+
+# Basic permission to write logs to CloudWatch Logs
+resource "aws_iam_role_policy_attachment" "items_handler_basic" {
+  role       = aws_iam_role.items_handler_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# Read/write permission on the DynamoDB table "items-table"
+resource "aws_iam_role_policy" "items_handler_items_table_access" {
+  name = "myapp-dev-items-handler-items-table-access"
+  role = aws_iam_role.items_handler_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+      ]
+      Resource = aws_dynamodb_table.items_table.arn
+    }]
+  })
+}
+
+resource "aws_lambda_function" "items_handler" {
+  function_name = "myapp-dev-items-handler"
+  role          = aws_iam_role.items_handler_role.arn
+
+  runtime = "python3.12"
+  handler = "index.lambda_handler" # Runs the lambda_handler function in index.py
+
+  # Place the deployment package (zip) here.
+  # Example: mkdir -p build && cd src && zip -r ../build/items_handler.zip .
+  filename = "build/items_handler.zip"
+
+  timeout = 10
+
+  # Pass connection details to the Lambda code as environment variables
+  environment {
+    variables = {
+      TABLE_NAME = aws_dynamodb_table.items_table.name
+    }
+  }
+}
+# ---------- API Gateway: items-api ----------
+
+resource "aws_apigatewayv2_api" "items_api" {
+  name          = "myapp-dev-items-api"
+  protocol_type = "HTTP" # Simple, low-cost HTTP API
+}
+
+# \$default stage (the deployment target). auto_deploy applies changes immediately
+resource "aws_apigatewayv2_stage" "items_api_default" {
+  api_id      = aws_apigatewayv2_api.items_api.id
+  name        = "\$default"
+  auto_deploy = true
+}
+
+# Integration with the Lambda "items-handler"
+resource "aws_apigatewayv2_integration" "items_api_items_handler" {
+  api_id                 = aws_apigatewayv2_api.items_api.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.items_handler.invoke_arn
+  payload_format_version = "2.0"
+}
+
+# Route every request to this Lambda
+resource "aws_apigatewayv2_route" "items_api_items_handler" {
+  api_id    = aws_apigatewayv2_api.items_api.id
+  route_key = "\$default"
+  target    = "integrations/\${aws_apigatewayv2_integration.items_api_items_handler.id}"
+}
+
+# Allow API Gateway to invoke this Lambda
+resource "aws_lambda_permission" "items_api_items_handler" {
+  statement_id  = "AllowInvokeFrom-myapp-dev-items-api"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.items_handler.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "\${aws_apigatewayv2_api.items_api.execution_arn}/*/*"
+}
+# ---------- Outputs (values shown after apply) ----------
+
+output "items_api_endpoint" {
+  description = "URL of items-api (reachable from a browser or curl after apply)"
+  value       = aws_apigatewayv2_api.items_api.api_endpoint
+}
+'
+`;
+
+snapshot[`RDB構成テンプレート(prd/en)のスナップショット 1`] = `
+'# ============================================================
+# Environment: PRD
+# This file was generated automatically from a diagram built with Zuform
+# How to run (from this environment directory):
+#   terraform init   - First time only. Downloads the provider plugins
+#   terraform plan   - Preview what will be created
+#   terraform apply  - Actually create the resources in AWS
+#   terraform destroy - Delete every resource that was created
+# ============================================================
+
+terraform {
+  required_version = ">= 1.5"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.region
+
+  # Automatically apply common tags to every resource in this file
+  default_tags {
+    tags = {
+      Project     = "myapp"
+      Environment = "prd"
+      ManagedBy   = "terraform"
+    }
+  }
+}
+
+variable "region" {
+  description = "AWS region in which the resources are created"
+  type        = string
+  default     = "ap-northeast-1" # Tokyo region
+}
+
+# ---------- Variables ----------
+
+variable "db_password" {
+  description = "Master password for the RDS database (entered at terraform apply time)"
+  type        = string
+  sensitive   = true # Keeps the value out of the execution log
+}
+
+# ---------- VPC: app-vpc ----------
+
+resource "aws_vpc" "app_vpc" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  tags = { Name = "myapp-prd-app-vpc" }
+}
+
+# Gateway to and from the internet
+resource "aws_internet_gateway" "app_vpc_igw" {
+  vpc_id = aws_vpc.app_vpc.id
+
+  tags = { Name = "myapp-prd-app-vpc-igw" }
+}
+
+# Public subnet (reachable from the internet)
+resource "aws_subnet" "app_vpc_public_a" {
+  vpc_id                  = aws_vpc.app_vpc.id
+  cidr_block              = "10.0.0.0/24"
+  availability_zone       = "\${var.region}a"
+  map_public_ip_on_launch = true
+
+  tags = { Name = "myapp-prd-app-vpc-public-a" }
+}
+
+# Private subnets across two AZs, for resources that stay off the internet (DBs, etc.)
+resource "aws_subnet" "app_vpc_private_a" {
+  vpc_id            = aws_vpc.app_vpc.id
+  cidr_block        = "10.0.10.0/24"
+  availability_zone = "\${var.region}a"
+
+  tags = { Name = "myapp-prd-app-vpc-private-a" }
+}
+
+resource "aws_subnet" "app_vpc_private_c" {
+  vpc_id            = aws_vpc.app_vpc.id
+  cidr_block        = "10.0.11.0/24"
+  availability_zone = "\${var.region}c"
+
+  tags = { Name = "myapp-prd-app-vpc-private-c" }
+}
+
+# Route table for the public subnet
+resource "aws_route_table" "app_vpc_public" {
+  vpc_id = aws_vpc.app_vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.app_vpc_igw.id
+  }
+
+  tags = { Name = "myapp-prd-app-vpc-public-rt" }
+}
+
+resource "aws_route_table_association" "app_vpc_public_a" {
+  subnet_id      = aws_subnet.app_vpc_public_a.id
+  route_table_id = aws_route_table.app_vpc_public.id
+}
+
+# ---------- Lambda function: get-users ----------
+
+# IAM role (the set of permissions) the Lambda assumes at runtime
+resource "aws_iam_role" "get_users_role" {
+  name = "myapp-prd-get-users-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = "sts:AssumeRole"
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
+  })
+}
+
+# Basic permission to write logs to CloudWatch Logs
+resource "aws_iam_role_policy_attachment" "get_users_basic" {
+  role       = aws_iam_role.get_users_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# Permission required to run inside a VPC
+resource "aws_iam_role_policy_attachment" "get_users_vpc" {
+  role       = aws_iam_role.get_users_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+# Security group for the Lambda
+resource "aws_security_group" "get_users_sg" {
+  name   = "myapp-prd-get-users-sg"
+  vpc_id = aws_vpc.app_vpc.id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = { Name = "myapp-prd-get-users-sg" }
+}
+
+resource "aws_lambda_function" "get_users" {
+  function_name = "myapp-prd-get-users"
+  role          = aws_iam_role.get_users_role.arn
+
+  runtime = "python3.12"
+  handler = "index.lambda_handler" # Runs the lambda_handler function in index.py
+
+  # Place the deployment package (zip) here.
+  # Example: mkdir -p build && cd src && zip -r ../build/get_users.zip .
+  filename = "build/get_users.zip"
+
+  timeout = 10
+
+  # Pass connection details to the Lambda code as environment variables
+  environment {
+    variables = {
+      DB_HOST     = aws_db_instance.users_db.address
+      DB_NAME     = aws_db_instance.users_db.db_name
+      DB_USER     = aws_db_instance.users_db.username
+      DB_PASSWORD = var.db_password # Use Secrets Manager in production
+    }
+  }
+
+  # Configuration needed to reach resources inside the VPC (RDS, etc.)
+  vpc_config {
+    subnet_ids         = [aws_subnet.app_vpc_private_a.id, aws_subnet.app_vpc_private_c.id]
+    security_group_ids = [aws_security_group.get_users_sg.id]
+  }
+}
+# ---------- RDS (MySQL): users-db ----------
+
+# Subnet group the DB is placed in (requires at least two AZs)
+resource "aws_db_subnet_group" "users_db" {
+  name       = "myapp-prd-users-db-subnets"
+  subnet_ids = [aws_subnet.app_vpc_private_a.id, aws_subnet.app_vpc_private_c.id]
+
+  tags = { Name = "myapp-prd-users-db-subnets" }
+}
+
+# Firewall that controls traffic to the DB
+resource "aws_security_group" "users_db_sg" {
+  name   = "myapp-prd-users-db-sg"
+  vpc_id = aws_vpc.app_vpc.id
+
+  # Allow connections from the Lambda "get-users"
+  ingress {
+    from_port       = 3306
+    to_port         = 3306
+    protocol        = "tcp"
+    security_groups = [aws_security_group.get_users_sg.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = { Name = "myapp-prd-users-db-sg" }
+}
+
+resource "aws_db_instance" "users_db" {
+  identifier        = "myapp-prd-users-db"
+  engine            = "mysql"
+  engine_version    = "8.0"
+  instance_class    = "db.t3.small"
+  allocated_storage = 20 # 20 GB of storage
+
+  db_name  = "app"
+  username = "admin"
+  password = var.db_password
+
+  db_subnet_group_name   = aws_db_subnet_group.users_db.name
+  vpc_security_group_ids = [aws_security_group.users_db_sg.id]
+
+  multi_az                = true # Replicated across two AZs (for production)
+  backup_retention_period = 7 # Retention period of automated backups, in days
+  deletion_protection     = true # Guards against accidental deletion
+  skip_final_snapshot     = false # Takes a final snapshot on deletion
+
+  publicly_accessible = false # Not reachable directly from the internet
+}
+
+# ---------- API Gateway: user-api ----------
+
+resource "aws_apigatewayv2_api" "user_api" {
+  name          = "myapp-prd-user-api"
+  protocol_type = "HTTP" # Simple, low-cost HTTP API
+}
+
+# \$default stage (the deployment target). auto_deploy applies changes immediately
+resource "aws_apigatewayv2_stage" "user_api_default" {
+  api_id      = aws_apigatewayv2_api.user_api.id
+  name        = "\$default"
+  auto_deploy = true
+}
+
+# Integration with the Lambda "get-users"
+resource "aws_apigatewayv2_integration" "user_api_get_users" {
+  api_id                 = aws_apigatewayv2_api.user_api.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.get_users.invoke_arn
+  payload_format_version = "2.0"
+}
+
+# Route every request to this Lambda
+resource "aws_apigatewayv2_route" "user_api_get_users" {
+  api_id    = aws_apigatewayv2_api.user_api.id
+  route_key = "\$default"
+  target    = "integrations/\${aws_apigatewayv2_integration.user_api_get_users.id}"
+}
+
+# Allow API Gateway to invoke this Lambda
+resource "aws_lambda_permission" "user_api_get_users" {
+  statement_id  = "AllowInvokeFrom-myapp-prd-user-api"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.get_users.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "\${aws_apigatewayv2_api.user_api.execution_arn}/*/*"
+}
+# ---------- Outputs (values shown after apply) ----------
+
+output "users_db_endpoint" {
+  description = "Connection host name of users-db"
+  value       = aws_db_instance.users_db.address
+}
+
+output "user_api_endpoint" {
+  description = "URL of user-api (reachable from a browser or curl after apply)"
+  value       = aws_apigatewayv2_api.user_api.api_endpoint
+}
+'
+`;

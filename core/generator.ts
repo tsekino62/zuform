@@ -4,6 +4,7 @@ import type {
   EnvId,
   GenContext,
   GenerateResult,
+  Locale,
   NamingConfig,
   ServiceType,
 } from './types.ts';
@@ -43,11 +44,24 @@ export function applyNamingPattern(
     .replace(/^-+|-+$/g, '');
 }
 
-function headerFor(env: EnvId, naming: NamingConfig): string {
+/** ロケールに応じて日本語／英語のどちらかを返す */
+function translator(locale: Locale): (ja: string, en: string) => string {
+  return (ja, en) => (locale === 'en' ? en : ja);
+}
+
+function headerFor(env: EnvId, naming: NamingConfig, locale: Locale): string {
+  const tr = translator(locale);
+  // コマンドと説明の区切り。英語では ASCII のハイフンにする
+  const sep = tr('…', '-');
   const tagsBlock = naming.commonTags
     ? `
 
-  # このファイルが作る全リソースに共通タグを自動付与する
+  # ${
+      tr(
+        'このファイルが作る全リソースに共通タグを自動付与する',
+        'Automatically apply common tags to every resource in this file',
+      )
+    }
   default_tags {
     tags = {
       Project     = "${naming.project}"
@@ -57,13 +71,26 @@ function headerFor(env: EnvId, naming: NamingConfig): string {
   }`
     : '';
   return `# ============================================================
-# 環境: ${env.toUpperCase()}
-# このファイルは Zuform で作成した構成図から自動生成されました
-# 実行方法（この環境のディレクトリで）:
-#   terraform init   … 初回のみ。プラグインをダウンロード
-#   terraform plan   … 何が作成されるかを事前確認
-#   terraform apply  … 実際にAWSへリソースを作成
-#   terraform destroy … 作成したリソースをすべて削除
+# ${tr('環境', 'Environment')}: ${env.toUpperCase()}
+# ${
+    tr(
+      'このファイルは Zuform で作成した構成図から自動生成されました',
+      'This file was generated automatically from a diagram built with Zuform',
+    )
+  }
+# ${tr('実行方法（この環境のディレクトリで）:', 'How to run (from this environment directory):')}
+#   terraform init   ${sep} ${
+    tr('初回のみ。プラグインをダウンロード', 'First time only. Downloads the provider plugins')
+  }
+#   terraform plan   ${sep} ${
+    tr('何が作成されるかを事前確認', 'Preview what will be created')
+  }
+#   terraform apply  ${sep} ${
+    tr('実際にAWSへリソースを作成', 'Actually create the resources in AWS')
+  }
+#   terraform destroy ${sep} ${
+    tr('作成したリソースをすべて削除', 'Delete every resource that was created')
+  }
 # ============================================================
 
 terraform {
@@ -82,9 +109,11 @@ provider "aws" {
 }
 
 variable "region" {
-  description = "リソースを作成するAWSリージョン"
+  description = "${
+    tr('リソースを作成するAWSリージョン', 'AWS region in which the resources are created')
+  }"
   type        = string
-  default     = "ap-northeast-1" # 東京リージョン
+  default     = "ap-northeast-1" # ${tr('東京リージョン', 'Tokyo region')}
 }
 `;
 }
@@ -99,6 +128,7 @@ function buildContext(
   nodes: AwsNode[],
   edges: Edge[],
   naming: NamingConfig,
+  locale: Locale,
 ): GenContext {
   const nodesById = new Map(nodes.map((n) => [n.id, n]));
 
@@ -125,6 +155,8 @@ function buildContext(
     nodes,
     edges,
     hints: [],
+    locale,
+    tr: translator(locale),
     name: (node) => names.get(node.id) ?? 'unnamed',
     physicalName: (node, suffix = '') => {
       let name = toKebabName(node.data.label);
@@ -170,7 +202,12 @@ function buildContext(
         const trimmed = line.replace(/[ \t]+$/, '');
         return trimmed === '' ? '' : `  ${trimmed}`;
       });
-      return `\n\n  # --- 追加設定（インスペクタの「追加HCL」から挿入） ---\n${lines.join('\n')}`;
+      return `\n\n  # --- ${
+        ctx.tr(
+          '追加設定（インスペクタの「追加HCL」から挿入）',
+          'Extra settings (inserted from "Extra HCL" in the inspector)',
+        )
+      } ---\n${lines.join('\n')}`;
     },
   };
   return ctx;
@@ -182,7 +219,9 @@ export function generateForEnv(
   allEdges: Edge[],
   env: EnvId,
   naming: NamingConfig,
+  locale: Locale = 'ja',
 ): GenerateResult {
+  const tr = translator(locale);
   // 環境フラグでノードを絞り込む。除外されたVPCの中のノードも除外
   const excluded: AwsNode[] = [];
   const included: AwsNode[] = [];
@@ -202,38 +241,54 @@ export function generateForEnv(
   const edges = allEdges.filter((e) => ids.has(e.source) && ids.has(e.target));
 
   if (allNodes.length === 0) {
+    const emptyBody = tr(
+      '\n# 左のパレットからアイコンをキャンバスへドラッグすると、\n# ここにTerraformコードが自動生成されます。\n',
+      '\n# Drag an icon from the palette on the left onto the canvas and\n# Terraform code will be generated here automatically.\n',
+    );
     return {
-      code: `${headerFor(env, naming)}\n# 左のパレットからアイコンをキャンバスへドラッグすると、\n# ここにTerraformコードが自動生成されます。\n`,
-      hints: ['左のパレットからアイコンをドラッグして、構成図を作り始めましょう。'],
+      code: `${headerFor(env, naming, locale)}${emptyBody}`,
+      hints: [
+        tr(
+          '左のパレットからアイコンをドラッグして、構成図を作り始めましょう。',
+          'Drag an icon from the palette on the left to start building your diagram.',
+        ),
+      ],
     };
   }
 
-  const ctx = buildContext(env, nodes, edges, naming);
+  const ctx = buildContext(env, nodes, edges, naming, locale);
 
   // マネージドサービスがVPC内に置かれていたら初心者向けにヒントを出す
   for (const n of nodes) {
     const t = n.data.serviceType;
     if ((t === 'apigateway' || t === 'dynamodb' || t === 's3') && ctx.parentVpc(n)) {
       ctx.hints.push(
-        `${n.data.label}（${MODULES[t].displayName}）はVPCの外で動くマネージドサービスです。VPC枠の外に配置するのが一般的です。`,
+        tr(
+          `${n.data.label}（${MODULES[t].displayName}）はVPCの外で動くマネージドサービスです。VPC枠の外に配置するのが一般的です。`,
+          `${n.data.label} (${MODULES[t].displayName}) is a managed service that runs outside a VPC. It is normally placed outside the VPC boundary.`,
+        ),
       );
     }
   }
 
-  const sections: string[] = [headerFor(env, naming)];
+  const sections: string[] = [headerFor(env, naming, locale)];
 
   if (excluded.length > 0) {
+    const heading = tr(
+      `この環境（${env.toUpperCase()}）では以下のリソースは対象外です:`,
+      `The following resources are excluded from this environment (${env.toUpperCase()}):`,
+    );
     sections.push(
-      `\n# この環境（${env.toUpperCase()}）では以下のリソースは対象外です:\n${excluded
-        .map((n) => `#   - ${n.data.label}`)
-        .join('\n')}\n`,
+      `\n# ${heading}\n${excluded.map((n) => `#   - ${n.data.label}`).join('\n')}\n`,
     );
   }
 
   // variables（各サービスモジュールが必要とするもの）
   for (const m of REGISTRY) {
     const block = m.variables?.(ctx) ?? '';
-    if (block.trim()) sections.push(`\n# ---------- 変数 ----------\n${block}`);
+    if (block.trim()) {
+      sections.push(`\n# ---------- ${tr('変数', 'Variables')} ----------\n${block}`);
+    }
   }
 
   // リソース本体の出力順（VPC・データストアを先に、入口系を後に）
@@ -268,8 +323,12 @@ export function generateForEnv(
     }
   }
   if (outputs.length > 0) {
+    const outputsHeading = tr(
+      '出力（apply後に表示される値）',
+      'Outputs (values shown after apply)',
+    );
     sections.push(`
-# ---------- 出力（apply後に表示される値） ----------
+# ---------- ${outputsHeading} ----------
 ${outputs.join('\n')}
 `);
   }
@@ -279,7 +338,10 @@ ${outputs.join('\n')}
     const hasTrigger = edges.some((e) => e.target === fn.id);
     if (!hasTrigger) {
       ctx.hints.push(
-        `Lambda「${fn.data.label}」を呼び出すサービスがありません。API Gatewayから矢印でつなぐとHTTP APIになります。`,
+        tr(
+          `Lambda「${fn.data.label}」を呼び出すサービスがありません。API Gatewayから矢印でつなぐとHTTP APIになります。`,
+          `Nothing invokes the Lambda "${fn.data.label}". Draw an arrow from an API Gateway to turn it into an HTTP API.`,
+        ),
       );
     }
   }
@@ -292,8 +354,9 @@ export function generateAll(
   nodes: AwsNode[],
   edges: Edge[],
   naming: NamingConfig,
+  locale: Locale = 'ja',
 ): Record<EnvId, GenerateResult> {
   return Object.fromEntries(
-    ENV_IDS.map((env) => [env, generateForEnv(nodes, edges, env, naming)]),
+    ENV_IDS.map((env) => [env, generateForEnv(nodes, edges, env, naming, locale)]),
   ) as Record<EnvId, GenerateResult>;
 }

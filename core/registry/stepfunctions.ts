@@ -17,7 +17,10 @@ export const stepfunctionsModule: ServiceModule = {
 
     if (steps.length === 0) {
       ctx.hints.push(
-        `Step Functions「${node.data.label}」にステップがありません。Lambdaへ矢印でつなぐと、つないだ順に実行するワークフローが生成されます。`,
+        ctx.tr(
+          `Step Functions「${node.data.label}」にステップがありません。Lambdaへ矢印でつなぐと、つないだ順に実行するワークフローが生成されます。`,
+          `The Step Functions workflow "${node.data.label}" has no steps. Draw arrows to Lambdas and a workflow that runs them in the order you connected them will be generated.`,
+        ),
       );
     }
 
@@ -38,14 +41,24 @@ export const stepfunctionsModule: ServiceModule = {
     const definitionBlock =
       steps.length > 0
         ? `{
-    Comment = "${node.data.label}: つないだLambdaを順番に実行するワークフロー"
+    Comment = "${
+          ctx.tr(
+            `${node.data.label}: つないだLambdaを順番に実行するワークフロー`,
+            `${node.data.label}: workflow that runs the connected Lambdas in order`,
+          )
+        }"
     StartAt = "Step1_${ctx.name(steps[0])}"
     States = {
 ${states.join('\n')}
     }
   }`
         : `{
-    Comment = "Lambdaが接続されていないため、何もしないワークフローです"
+    Comment = "${
+          ctx.tr(
+            'Lambdaが接続されていないため、何もしないワークフローです',
+            'No Lambda is connected, so this workflow does nothing',
+          )
+        }"
     StartAt = "Nothing"
     States = {
       Nothing = {
@@ -59,7 +72,12 @@ ${states.join('\n')}
       steps.length > 0
         ? `
 
-# ワークフローが各Lambdaを呼び出す権限
+# ${
+      ctx.tr(
+        'ワークフローが各Lambdaを呼び出す権限',
+        'Permission for the workflow to invoke each Lambda',
+      )
+    }
 resource "aws_iam_role_policy" "${n}_invoke" {
   name = "invoke-steps"
   role = aws_iam_role.${n}_role.id
@@ -80,7 +98,12 @@ ${steps.map((fn) => `        aws_lambda_function.${ctx.name(fn)}.arn,`).join('\n
     return `
 # ---------- Step Functions: ${node.data.label} ----------
 
-# ステートマシンが実行時に使うIAMロール
+# ${
+      ctx.tr(
+        'ステートマシンが実行時に使うIAMロール',
+        'IAM role the state machine assumes at runtime',
+      )
+    }
 resource "aws_iam_role" "${n}_role" {
   name = "${physical}-role"
 
@@ -98,7 +121,12 @@ resource "aws_sfn_state_machine" "${n}" {
   name     = "${physical}"
   role_arn = aws_iam_role.${n}_role.arn
 
-  # ワークフローの定義（つないだLambdaを上から順に実行）
+  # ${
+      ctx.tr(
+        'ワークフローの定義（つないだLambdaを上から順に実行）',
+        'Workflow definition (runs the connected Lambdas from top to bottom)',
+      )
+    }
   definition = jsonencode(${definitionBlock})
 
   tags = { Name = "${physical}" }${ctx.extraBlock(node)}
@@ -110,7 +138,12 @@ resource "aws_sfn_state_machine" "${n}" {
     const n = ctx.name(node);
     return `
 output "${n}_arn" {
-  description = "${node.data.label} のARN（AWSコンソールから実行を確認できます）"
+  description = "${
+      ctx.tr(
+        `${node.data.label} のARN（AWSコンソールから実行を確認できます）`,
+        `ARN of ${node.data.label} (you can watch executions in the AWS console)`,
+      )
+    }"
   value       = aws_sfn_state_machine.${n}.arn
 }`;
   },

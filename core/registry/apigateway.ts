@@ -16,7 +16,10 @@ export const apigatewayModule: ServiceModule = {
     const lambdas = ctx.targetsOf(node, 'lambda');
     if (lambdas.length === 0) {
       ctx.hints.push(
-        `API Gateway「${node.data.label}」がどのLambdaにも接続されていません。Lambdaのアイコンへ矢印でつなぐと、APIのルートが自動生成されます。`,
+        ctx.tr(
+          `API Gateway「${node.data.label}」がどのLambdaにも接続されていません。Lambdaのアイコンへ矢印でつなぐと、APIのルートが自動生成されます。`,
+          `The API Gateway "${node.data.label}" is not connected to any Lambda. Draw an arrow to a Lambda icon and the API routes will be generated for you.`,
+        ),
       );
     }
 
@@ -26,10 +29,15 @@ export const apigatewayModule: ServiceModule = {
 
 resource "aws_apigatewayv2_api" "${a}" {
   name          = "${physical}"
-  protocol_type = "HTTP" # シンプルで低コストなHTTP API${ctx.extraBlock(node)}
+  protocol_type = "HTTP" # ${ctx.tr('シンプルで低コストなHTTP API', 'Simple, low-cost HTTP API')}${ctx.extraBlock(node)}
 }
 
-# $default ステージ（デプロイ先）。auto_deployで変更が即時反映される
+# ${
+      ctx.tr(
+        '$default ステージ（デプロイ先）。auto_deployで変更が即時反映される',
+        '$default stage (the deployment target). auto_deploy applies changes immediately',
+      )
+    }
 resource "aws_apigatewayv2_stage" "${a}_default" {
   api_id      = aws_apigatewayv2_api.${a}.id
   name        = "$default"
@@ -42,10 +50,20 @@ resource "aws_apigatewayv2_stage" "${a}_default" {
         lambdas.length === 1 ? '$default' : `ANY /${l.replace(/_/g, '-')}/{proxy+}`;
       const routeComment =
         lambdas.length === 1
-          ? '# すべてのリクエストをこのLambdaへ'
-          : `# /${l.replace(/_/g, '-')}/... へのリクエストをこのLambdaへ`;
+          ? `# ${ctx.tr('すべてのリクエストをこのLambdaへ', 'Route every request to this Lambda')}`
+          : `# ${
+            ctx.tr(
+              `/${l.replace(/_/g, '-')}/... へのリクエストをこのLambdaへ`,
+              `Route /${l.replace(/_/g, '-')}/... requests to this Lambda`,
+            )
+          }`;
       parts.push(`
-# Lambda「${fn.data.label}」との接続
+# ${
+        ctx.tr(
+          `Lambda「${fn.data.label}」との接続`,
+          `Integration with the Lambda "${fn.data.label}"`,
+        )
+      }
 resource "aws_apigatewayv2_integration" "${a}_${l}" {
   api_id                 = aws_apigatewayv2_api.${a}.id
   integration_type       = "AWS_PROXY"
@@ -60,7 +78,12 @@ resource "aws_apigatewayv2_route" "${a}_${l}" {
   target    = "integrations/\${aws_apigatewayv2_integration.${a}_${l}.id}"
 }
 
-# API GatewayがこのLambdaを呼び出すことを許可
+# ${
+        ctx.tr(
+          'API GatewayがこのLambdaを呼び出すことを許可',
+          'Allow API Gateway to invoke this Lambda',
+        )
+      }
 resource "aws_lambda_permission" "${a}_${l}" {
   statement_id  = "AllowInvokeFrom-${physical}"
   action        = "lambda:InvokeFunction"
@@ -77,7 +100,12 @@ resource "aws_lambda_permission" "${a}_${l}" {
     const a = ctx.name(node);
     return `
 output "${a}_endpoint" {
-  description = "${node.data.label} のURL（apply後にブラウザやcurlでアクセスできます）"
+  description = "${
+      ctx.tr(
+        `${node.data.label} のURL（apply後にブラウザやcurlでアクセスできます）`,
+        `URL of ${node.data.label} (reachable from a browser or curl after apply)`,
+      )
+    }"
   value       = aws_apigatewayv2_api.${a}.api_endpoint
 }`;
   },

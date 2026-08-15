@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertThrows } from '@std/assert';
+import { assert, assertEquals, assertStringIncludes, assertThrows } from '@std/assert';
 import { ArchParseError, parseArchYaml, serializeArchYaml } from './archfile.ts';
 import { generateForEnv } from './generator.ts';
 import { DEFAULT_NAMING } from './types.ts';
@@ -348,4 +348,161 @@ Deno.test('serializeArchYaml: labelが重複する場合は-2 -3で一意化しc
   assertEquals(reparsedEdges.length, 1);
   assertEquals(reparsedEdges[0].source, 'fn');
   assertEquals(reparsedEdges[0].target, 'fn-2');
+});
+
+// ---------- コメント保持（previousText付きserialize） ----------
+
+/** コメント・空行を含むarchfile。差分適用モードのテストで共通利用する */
+const COMMENTED_YAML = `# サンプルアーキテクチャ
+version: 1
+project: myapp
+naming:
+  pattern: "{project}-{env}-{name}"
+  commonTags: true
+
+resources:
+  my-vpc:
+    type: vpc
+  user-api:
+    type: apigateway
+  get-users: # ユーザー取得Lambda
+    type: lambda
+    in: my-vpc
+    envs: [dev, stg]
+    extra_hcl: |
+      memory_size = 512
+  users-db:
+    type: rds
+    in: my-vpc
+
+connections:
+  - user-api -> get-users # メインの通信経路
+  - get-users -> users-db
+
+layout:
+  my-vpc: [360, 80, 560, 340]
+  user-api: [80, 210]
+  get-users: [200, 210]
+  users-db: [320, 210]
+`;
+
+function simplifyForRoundTrip(nodes: AwsNode[]) {
+  return nodes
+    .map((n) => ({
+      id: n.id,
+      label: n.data.label,
+      type: n.data.serviceType,
+      parentId: n.parentId,
+      envs: n.data.envs,
+      extraHcl: n.data.extraHcl,
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+Deno.test('serializeArchYaml(previousText): 変更が無ければコメント・書式がそのまま保持される', () => {
+  const parsed = parseArchYaml(COMMENTED_YAML);
+  const serialized = serializeArchYaml(parsed.nodes, parsed.edges, parsed.naming, COMMENTED_YAML);
+
+  assertStringIncludes(serialized, '# サンプルアーキテクチャ');
+  assertStringIncludes(serialized, '# ユーザー取得Lambda');
+  assertStringIncludes(serialized, '# メインの通信経路');
+  assertStringIncludes(serialized, 'extra_hcl: |\n      memory_size = 512');
+});
+
+Deno.test('serializeArchYaml(previousText): ノード追加時、既存リソースのコメントは保たれ新規リソースは末尾に追加される', () => {
+  const parsed = parseArchYaml(COMMENTED_YAML);
+  const newNode: AwsNode = {
+    id: 'notify-fn',
+    type: 'aws',
+    position: { x: 500, y: 400 },
+    data: { serviceType: 'lambda', label: 'notify-fn' },
+  };
+  const nodes = [...parsed.nodes, newNode];
+
+  const serialized = serializeArchYaml(nodes, parsed.edges, parsed.naming, COMMENTED_YAML);
+
+  // 既存リソースのコメント・書式は維持
+  assertStringIncludes(serialized, '# ユーザー取得Lambda');
+  assertStringIncludes(serialized, '# メインの通信経路');
+  // 新規リソースは末尾に追加される
+  assertStringIncludes(serialized, 'notify-fn:');
+  assert(serialized.indexOf('users-db:') < serialized.indexOf('notify-fn:'));
+
+  const reparsed = parseArchYaml(serialized);
+  assertEquals(reparsed.nodes.map((n) => n.id).sort(), [
+    'get-users',
+    'my-vpc',
+    'notify-fn',
+    'user-api',
+    'users-db',
+  ]);
+});
+
+Deno.test('serializeArchYaml(previousText): ノード削除時、そのキー(とコメント)が消え他は保たれる', () => {
+  const parsed = parseArchYaml(COMMENTED_YAML);
+  const nodes = parsed.nodes.filter((n) => n.id !== 'users-db');
+  const edges = parsed.edges.filter((e) => e.source !== 'users-db' && e.target !== 'users-db');
+
+  const serialized = serializeArchYaml(nodes, edges, parsed.naming, COMMENTED_YAML);
+
+  assert(!serialized.includes('users-db:'));
+  // 他のリソースのコメントは残る
+  assertStringIncludes(serialized, '# ユーザー取得Lambda');
+  assertStringIncludes(serialized, 'extra_hcl: |\n      memory_size = 512');
+  // 削除されたリソースのlayoutエントリも消える
+  assert(!serialized.split('layout:')[1].includes('users-db'));
+});
+
+Deno.test('serializeArchYaml(previousText): 座標だけ変わった場合、layoutの数値だけ更新されresources部は無変更', () => {
+  const parsed = parseArchYaml(COMMENTED_YAML);
+  const nodes = parsed.nodes.map((n) =>
+    n.id === 'user-api' ? { ...n, position: { x: 999, y: 888 } } : n
+  );
+
+  const serialized = serializeArchYaml(nodes, parsed.edges, parsed.naming, COMMENTED_YAML);
+
+  assertStringIncludes(serialized, 'user-api: [999, 888]');
+  // resources部の書式・コメントは無変更
+  assertStringIncludes(serialized, '# ユーザー取得Lambda');
+  assertStringIncludes(serialized, 'extra_hcl: |\n      memory_size = 512');
+  assertStringIncludes(serialized, 'envs: [dev, stg]');
+});
+
+Deno.test('serializeArchYaml: previousTextを渡さない場合は従来と完全に同じ出力になる（回帰確認）', () => {
+  const parsed = parseArchYaml(COMMENTED_YAML);
+  const withoutPrevious = serializeArchYaml(parsed.nodes, parsed.edges, parsed.naming);
+  const explicitUndefined = serializeArchYaml(
+    parsed.nodes,
+    parsed.edges,
+    parsed.naming,
+    undefined,
+  );
+
+  assertEquals(withoutPrevious, explicitUndefined);
+  // 従来の手組み生成の書式（flow配列に余分な空白を入れない等）のままであること
+  assertStringIncludes(withoutPrevious, 'envs: [dev, stg]');
+  assert(!withoutPrevious.includes('[ dev, stg ]'));
+});
+
+Deno.test('serializeArchYaml(previousText): 壊れたpreviousTextは例外を投げず新規生成にフォールバックする', () => {
+  const parsed = parseArchYaml(COMMENTED_YAML);
+  const broken = 'resources:\n  - [';
+
+  const serialized = serializeArchYaml(parsed.nodes, parsed.edges, parsed.naming, broken);
+  const fresh = serializeArchYaml(parsed.nodes, parsed.edges, parsed.naming);
+
+  assertEquals(serialized, fresh);
+});
+
+Deno.test('serializeArchYaml(previousText): ラウンドトリップ（parse→serialize→parse）でモデルが一致する', () => {
+  const first = parseArchYaml(COMMENTED_YAML);
+  const serialized = serializeArchYaml(first.nodes, first.edges, first.naming, COMMENTED_YAML);
+  const second = parseArchYaml(serialized);
+
+  assertEquals(second.naming, first.naming);
+  assertEquals(
+    second.edges.map((e) => [e.source, e.target]).sort(),
+    first.edges.map((e) => [e.source, e.target]).sort(),
+  );
+  assertEquals(simplifyForRoundTrip(second.nodes), simplifyForRoundTrip(first.nodes));
 });

@@ -5,7 +5,7 @@ import { generateAll } from '@zuform/core/generator';
 import type { AwsNode, EnvId, NamingConfig } from '@zuform/core/types';
 import { ENV_IDS } from '@zuform/core/types';
 import { isInVsCode, postWriteFiles } from '../vscode.ts';
-import { CUSTOM_TF, ENVIRONMENTS_README } from '../generatedFiles.ts';
+import { buildCustomTf, buildEnvironmentsReadme } from '../generatedFiles.ts';
 import { useLang } from '../i18n.ts';
 
 /** VSCodeのWebview内で動いているか（起動時に一度だけ判定する） */
@@ -54,12 +54,15 @@ function downloadBlob(blob: Blob, filename: string) {
 }
 
 export function CodePanel({ nodes, edges, naming }: Props) {
-  const { t } = useLang();
+  const { lang, t } = useLang();
   const [env, setEnv] = useState<EnvId>('dev');
   const [tab, setTab] = useState<'code' | 'hints'>('code');
   const [copied, setCopied] = useState(false);
 
-  const results = useMemo(() => generateAll(nodes, edges, naming), [nodes, edges, naming]);
+  const results = useMemo(
+    () => generateAll(nodes, edges, naming, lang),
+    [nodes, edges, naming, lang],
+  );
   const { code, hints } = results[env];
   const html = useMemo(() => highlightHcl(code), [code]);
 
@@ -83,11 +86,12 @@ export function CodePanel({ nodes, edges, naming }: Props) {
    */
   const buildFiles = (): Record<string, string> => {
     const files: Record<string, string> = {
-      'environments/README.md': ENVIRONMENTS_README,
+      'environments/README.md': buildEnvironmentsReadme(lang),
     };
+    const customTf = buildCustomTf(lang);
     for (const e of ENV_IDS) {
       files[`environments/${e}/main.tf`] = results[e].code;
-      files[`environments/${e}/custom.tf`] = CUSTOM_TF;
+      files[`environments/${e}/custom.tf`] = customTf;
     }
     return files;
   };

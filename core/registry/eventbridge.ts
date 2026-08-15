@@ -19,14 +19,26 @@ export const eventbridgeModule: ServiceModule = {
 
     const parts: string[] = [];
     parts.push(`
-# ---------- EventBridge スケジュール: ${node.data.label} ----------
+# ---------- ${
+      ctx.tr(
+        `EventBridge スケジュール: ${node.data.label}`,
+        `EventBridge schedule: ${node.data.label}`,
+      )
+    } ----------
 
 resource "aws_cloudwatch_event_rule" "${n}" {
   name = "${physical}"
 
-  # 実行間隔。cron式も使えます（UTC基準な点に注意）
+  # ${
+      ctx.tr(
+        `実行間隔。cron式も使えます（UTC基準な点に注意）
   #   毎日 09:00 JST → cron(0 0 * * ? *)
-  #   5分ごと       → rate(5 minutes)
+  #   5分ごと       → rate(5 minutes)`,
+        `How often it runs. cron expressions also work (note they are in UTC)
+  #   Every day at 09:00 JST -> cron(0 0 * * ? *)
+  #   Every 5 minutes        -> rate(5 minutes)`,
+      )
+    }
   schedule_expression = "rate(1 day)"
 
   tags = { Name = "${physical}" }${ctx.extraBlock(node)}
@@ -35,13 +47,23 @@ resource "aws_cloudwatch_event_rule" "${n}" {
     for (const fn of lambdaTargets) {
       const l = ctx.name(fn);
       parts.push(`
-# スケジュールでLambda「${fn.data.label}」を起動
+# ${
+        ctx.tr(
+          `スケジュールでLambda「${fn.data.label}」を起動`,
+          `Invoke the Lambda "${fn.data.label}" on this schedule`,
+        )
+      }
 resource "aws_cloudwatch_event_target" "${n}_${l}" {
   rule = aws_cloudwatch_event_rule.${n}.name
   arn  = aws_lambda_function.${l}.arn
 }
 
-# EventBridgeがこのLambdaを呼び出すことを許可
+# ${
+        ctx.tr(
+          'EventBridgeがこのLambdaを呼び出すことを許可',
+          'Allow EventBridge to invoke this Lambda',
+        )
+      }
 resource "aws_lambda_permission" "${n}_${l}" {
   statement_id  = "AllowInvokeFromEventBridge-${physical}"
   action        = "lambda:InvokeFunction"
@@ -54,7 +76,12 @@ resource "aws_lambda_permission" "${n}_${l}" {
     for (const sfn of sfnTargets) {
       const s = ctx.name(sfn);
       parts.push(`
-# EventBridgeがStep Functionsを開始するためのIAMロール
+# ${
+        ctx.tr(
+          'EventBridgeがStep Functionsを開始するためのIAMロール',
+          'IAM role that lets EventBridge start the Step Functions workflow',
+        )
+      }
 resource "aws_iam_role" "${n}_${s}_role" {
   name = "${physical}-${ctx.name(sfn).replace(/_/g, '-')}-role"
 
@@ -82,7 +109,12 @@ resource "aws_iam_role_policy" "${n}_${s}_start" {
   })
 }
 
-# スケジュールでワークフロー「${sfn.data.label}」を開始
+# ${
+        ctx.tr(
+          `スケジュールでワークフロー「${sfn.data.label}」を開始`,
+          `Start the workflow "${sfn.data.label}" on this schedule`,
+        )
+      }
 resource "aws_cloudwatch_event_target" "${n}_${s}" {
   rule     = aws_cloudwatch_event_rule.${n}.name
   arn      = aws_sfn_state_machine.${s}.arn
@@ -92,7 +124,10 @@ resource "aws_cloudwatch_event_target" "${n}_${s}" {
 
     if (lambdaTargets.length === 0 && sfnTargets.length === 0) {
       ctx.hints.push(
-        `EventBridge「${node.data.label}」の実行先がありません。LambdaまたはStep Functionsへ矢印でつなぐと定期実行が設定されます。`,
+        ctx.tr(
+          `EventBridge「${node.data.label}」の実行先がありません。LambdaまたはStep Functionsへ矢印でつなぐと定期実行が設定されます。`,
+          `The EventBridge schedule "${node.data.label}" has no target. Draw an arrow to a Lambda or a Step Functions workflow to set up the recurring run.`,
+        ),
       );
     }
 

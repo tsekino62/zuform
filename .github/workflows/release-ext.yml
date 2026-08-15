@@ -1,0 +1,67 @@
+name: Release VSCode Extension
+
+# vscode-ext/ を Marketplace へ公開するワークフロー。
+# - タグ push（ext-v*）: ビルド → vsix パッケージ → Marketplace へ publish
+# - workflow_dispatch（手動実行）: ビルド → vsix パッケージ → artifact へアップロードのみ（dry-run、publishはしない）
+#
+# secrets.VSCE_PAT が未設定でもこのファイル自体は無害。
+# publish ステップはタグ push イベントのときしか実行されないため、
+# workflow_dispatch での手動実行や、シークレット未設定のリポジトリでも安全に走る。
+
+on:
+  push:
+    tags:
+      - 'ext-v*'
+  workflow_dispatch:
+
+jobs:
+  build-and-publish:
+    name: 拡張のビルド・パッケージ・公開
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 拡張のビルド（web UI ビルド + media コピー + esbuild）
+        run: deno task ext:build
+
+      - name: vsix のパッケージ
+        working-directory: vscode-ext
+        run: npx --yes @vscode/vsce package --no-dependencies
+
+      - name: vsix を artifact へアップロード
+        uses: actions/upload-artifact@v4
+        with:
+          name: zuform-vscode-vsix
+          path: vscode-ext/*.vsix
+
+      # Marketplace は同じバージョンを再公開できないため、
+      # タグ（ext-v0.1.0）と package.json の version がずれたまま公開すると取り返しがつかない。
+      # publish の前に一致を確認し、ずれていればここで止める。
+      - name: タグと package.json のバージョン一致を確認
+        if: startsWith(github.ref, 'refs/tags/ext-v')
+        working-directory: vscode-ext
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#ext-v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::タグ ($TAG_VERSION) と package.json ($PKG_VERSION) のバージョンが一致しません"
+            exit 1
+          fi
+          if [ -z "${{ secrets.VSCE_PAT }}" ]; then
+            echo "::error::シークレット VSCE_PAT が未設定です。Settings > Secrets で登録してください"
+            exit 1
+          fi
+          echo "公開バージョン: $PKG_VERSION"
+
+      - name: Marketplace へ公開（タグ push 時のみ）
+        if: startsWith(github.ref, 'refs/tags/ext-v')
+        working-directory: vscode-ext
+        run: npx --yes @vscode/vsce publish --no-dependencies -p "${{ secrets.VSCE_PAT }}"

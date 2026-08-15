@@ -70,15 +70,39 @@ npx @vscode/vsce package --no-dependencies
 
 生成された `.vsix` は `code --install-extension zuform-vscode-0.1.0.vsix` でローカルに入れられます。
 
-## Marketplace公開（手動手順）
+## Marketplace公開（手動アップロード）
 
-CIワークフロー（`.github/workflows/release-ext.yml`）は用意済みですが、
-以下はリポジトリのオーナーが一度だけ手動で行う必要がある準備作業です。
+**Azure DevOpsの組織もPATも不要な、いちばん簡単な公開方法。**
+初回公開はこちらで済ませ、CIによる自動公開は後から設定してもかまいません。
 
-1. https://marketplace.visualstudio.com/manage で publisher を作成する（Azure DevOpsアカウントが必要）
+1. `deno task ext:build` してから `npx @vscode/vsce package --no-dependencies` で
+   `.vsix` を作る
+2. https://marketplace.visualstudio.com/manage に**個人の**Microsoftアカウントでサインインし、
+   **Create publisher** で publisher を作る
+   - publisher ID が `package.json` の `publisher`（現在 `tsekino62`）と異なる場合は、
+     `package.json` を実際のIDに合わせて修正してから vsix を作り直すこと
+3. **New extension → Visual Studio Code** から `.vsix` をアップロードする
+
+以降のバージョンアップも、同じ画面から新しい `.vsix` をアップロードすれば更新できます。
+
+> 会社アカウントでサインインすると `AADSTS90123`（テナントのポリシーによる拒否）になります。
+> 個人のMicrosoftアカウントを使ってください。
+
+## Marketplace公開（CIによる自動公開）
+
+`.github/workflows/release-ext.yml` でタグpushから自動公開できます。
+こちらは Azure DevOps の Personal Access Token が必要です。
+
+1. https://marketplace.visualstudio.com/manage で publisher を作成する（上記と同じ）
 2. 作成した publisher ID が `package.json` の `publisher`（現在 `tsekino62`）と異なる場合は、
    `vscode-ext/package.json` の `publisher` フィールドを実際のIDに合わせて修正する
 3. Azure DevOps の Personal Access Token 画面で、スコープ **Marketplace: Manage** のPATを発行する
+   （Organization は **All accessible organizations** を選ぶこと。特定組織にすると公開時に401になる）
+
+   PAT発行には Azure DevOps の組織が必要。組織が無いと `dev.azure.com` は
+   Azureポータルへリダイレクトされるので、先に https://aka.ms/SignupAzureDevOps で作成する。
+   組織作成が「Oops! Something happened」等で失敗する場合は、上の**手動アップロード**で公開できる。
+
 4. GitHubリポジトリの **Settings > Secrets and variables > Actions** に、
    発行したPATを `VSCE_PAT` という名前のSecretとして登録する
 5. リリースしたいバージョンでタグを打って push する

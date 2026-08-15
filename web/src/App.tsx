@@ -530,7 +530,7 @@ function FlowEditor() {
     <div className="app">
       <header className="header">
         <div className="header__brand">
-          <span className="header__mark">▦</span>
+          <span className="header__mark" aria-hidden="true">Z</span>
           <h1>
             Zuform
             <span className="header__sub">{t('header.subtitle')}</span>

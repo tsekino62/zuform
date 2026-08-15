@@ -37,8 +37,11 @@
   border-radius: 7px;
   background: var(--accent);
   color: var(--ink-deep);
-  font-size: 16px;
-  font-weight: 700;
+  /* ファビコン（favicon.svg）と同じ「Z」。太く角ばった見た目に寄せる */
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .header h1 {

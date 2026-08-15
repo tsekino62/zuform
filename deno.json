@@ -1,11 +1,12 @@
 {
+  "workspace": ["./core", "./web"],
   "tasks": {
-    "dev": "deno run -A npm:vite@8",
-    "build": "deno run -A npm:vite@8 build",
-    "preview": "deno run -A npm:vite@8 preview",
-    "check": "deno check src/",
-    "test": "deno test -A src/",
-    "test:update": "deno test -A src/ -- --update",
+    "dev": "deno run -A npm:vite@8 dev web",
+    "build": "deno run -A npm:vite@8 build web",
+    "preview": "deno run -A npm:vite@8 preview web",
+    "check": "deno check core/ web/src/",
+    "test": "deno test -A core/ web/src/",
+    "test:update": "deno test -A core/ web/src/ -- --update",
     "fixtures": "deno run -A scripts/emit_fixtures.ts",
     "ext:build": "deno task build && cd vscode-ext && npm install --silent && npm run build"
   },
@@ -31,5 +32,5 @@
     "yaml": "npm:yaml@^2.5.0",
     "@dagrejs/dagre": "npm:@dagrejs/dagre@^1.1.0"
   },
-  "exclude": ["dist/"]
+  "exclude": ["web/dist/"]
 }

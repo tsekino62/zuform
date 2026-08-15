@@ -1,5 +1,5 @@
 import type { Edge } from '@xyflow/react';
-import type { AwsNode, ServiceType } from '../aws/types.ts';
+import type { AwsNode, ServiceType } from './types.ts';
 
 export interface DiagramTemplate {
   id: string;

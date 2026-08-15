@@ -26,9 +26,9 @@
 // ============================================================
 
 import type { Edge } from '@xyflow/react';
-import type { AwsNode, NamingConfig } from './aws/types.ts';
-import { DEFAULT_NAMING } from './aws/types.ts';
-import { parseArchYaml, serializeArchYaml } from './aws/archfile.ts';
+import type { AwsNode, NamingConfig } from '@zuform/core/types';
+import { DEFAULT_NAMING } from '@zuform/core/types';
+import { parseArchYaml, serializeArchYaml } from '@zuform/core/archfile';
 
 /** ドキュメントの記法。拡張側はファイル名から判定して init に載せてくる */
 export type DocumentLanguage = 'yaml' | 'json';

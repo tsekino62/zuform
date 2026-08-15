@@ -1,8 +1,8 @@
 import { assertEquals, assertFalse, assertStringIncludes, assertThrows } from '@std/assert';
 import type { Edge } from '@xyflow/react';
-import type { AwsNode } from './aws/types.ts';
-import { DEFAULT_NAMING } from './aws/types.ts';
-import { ArchParseError } from './aws/archfile.ts';
+import type { AwsNode } from '@zuform/core/types';
+import { DEFAULT_NAMING } from '@zuform/core/types';
+import { ArchParseError } from '@zuform/core/archfile';
 import {
   isInVsCode,
   onInit,

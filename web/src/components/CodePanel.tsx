@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import type { Edge } from '@xyflow/react';
 import { strToU8, zipSync } from 'fflate';
-import { generateAll } from '../aws/generator.ts';
-import type { AwsNode, EnvId, NamingConfig } from '../aws/types.ts';
-import { ENV_IDS } from '../aws/types.ts';
+import { generateAll } from '@zuform/core/generator';
+import type { AwsNode, EnvId, NamingConfig } from '@zuform/core/types';
+import { ENV_IDS } from '@zuform/core/types';
 import { isInVsCode, postWriteFiles } from '../vscode.ts';
 
 /** VSCodeのWebview内で動いているか（起動時に一度だけ判定する） */

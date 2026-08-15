@@ -1,6 +1,6 @@
 import type { DragEvent } from 'react';
-import { REGISTRY } from '../aws/registry/index.ts';
-import { ICONS } from '../aws/icons.ts';
+import { REGISTRY } from '@zuform/core/registry';
+import { ICONS } from '../icons.ts';
 
 const CATEGORY_ORDER = [
   'ネットワーク',

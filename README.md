@@ -27,7 +27,7 @@ AWSのリソースを **draw.io のような画面でドラッグ&ドロップ�
   - `environments/{dev,stg,prd}/main.tf` 構成のZIP一括ダウンロード（tfstateが環境ごとに分離）
 - 図を **アーキテクチャ定義ファイル（`*.awsarch.yaml`）** として保存/読み込み、ブラウザへの自動保存
 
-アイコンは [AWS公式 Architecture Icons](https://aws.amazon.com/jp/architecture/icons/) を使用しています（[NOTICE](src/assets/aws-icons/NOTICE.md)）。
+アイコンは [AWS公式 Architecture Icons](https://aws.amazon.com/jp/architecture/icons/) を使用しています（[NOTICE](web/src/assets/aws-icons/NOTICE.md)）。
 
 ## 起動方法
 
@@ -42,7 +42,7 @@ deno task dev
 | コマンド | 内容 |
 |---------|------|
 | `deno task dev` | 開発サーバー起動 |
-| `deno task build` | 本番ビルド（`dist/`） |
+| `deno task build` | 本番ビルド（`web/dist/`） |
 | `deno task test` | ジェネレータのテスト（スナップショット含む） |
 | `deno task test:update` | スナップショットの更新 |
 | `deno task check` | 型チェック |
@@ -145,31 +145,45 @@ deno task ext:build
 
 ## プロジェクト構成
 
+Deno 2 のワークスペースで、**UIに依存しない純粋ロジック（`core/`）** と
+**Viteアプリ（`web/`）** を分けています。`core/` はブラウザにもDenoにも依存せず単体でテストできます。
+
 ```
-src/
-├── aws/
+zuform/
+├── deno.json              # ワークスペース定義・依存マップ・全タスク（実行はすべてルートから）
+├── core/                  # @zuform/core — UIに依存しない純粋ロジック
+│   ├── deno.json          # パッケージ名と exports（@zuform/core/generator など）
 │   ├── types.ts           # 共有型・環境プロファイル・命名設定
 │   ├── generator.ts       # 環境別生成のオーケストレータ（命名・環境フィルタ）
 │   ├── generator_test.ts  # テスト（スナップショット含む）
 │   ├── archfile.ts        # *.awsarch.yaml ⇄ 図（自動レイアウト込み）
-│   ├── icons.ts           # 公式アイコン（UI専用）
+│   ├── templates.ts       # 用途別テンプレート定義
 │   └── registry/          # ★サービスごとに1ファイル
 │       ├── index.ts       # レジストリ（接続ルールもここから導出）
 │       ├── apigateway.ts / cloudfront.ts / lambda.ts / ec2.ts
 │       ├── sqs.ts / sns.ts / eventbridge.ts / stepfunctions.ts
 │       └── dynamodb.ts / rds.ts / s3.ts / vpc.ts
-├── flow/
-│   └── templates.ts       # 用途別テンプレート定義
-└── components/            # パレット / ノード / コードパネル / モーダル類
+├── web/                   # @zuform/web — Viteアプリ（成果物は web/dist/）
+│   ├── index.html
+│   ├── vite.config.ts     # base: './' と @zuform/core のエイリアス解決
+│   ├── public/
+│   └── src/
+│       ├── main.tsx / App.tsx
+│       ├── icons.ts       # 公式アイコン（SVG import＝Vite依存）
+│       ├── vscode.ts      # VSCode Webview との橋渡し
+│       ├── assets/aws-icons/
+│       └── components/    # パレット / ノード / コードパネル / モーダル類
+├── vscode-ext/            # VSCode拡張（web/dist/ を media/ へコピーして使う）
+└── scripts/               # fixtures 生成などの補助スクリプト
 ```
 
 ## サービスの追加方法（コントリビューション歓迎）
 
-1. `src/aws/registry/` に `ServiceModule` 実装を1ファイル追加
+1. `core/registry/` に `ServiceModule` 実装を1ファイル追加
    - パレット表示情報・接続ルール（`connectsTo`）・HCL生成（`generate`）・出力（`outputs`）
-2. `src/aws/registry/index.ts` の配列に登録
-3. `src/aws/icons.ts` に公式アイコンを追加
-4. `src/aws/generator_test.ts` にテストケースを追加して `deno task test`
+2. `core/registry/index.ts` の配列に登録
+3. `web/src/icons.ts` に公式アイコンを追加
+4. `core/generator_test.ts` にテストケースを追加して `deno task test`
 
 詳しい手順やPRの前に確認すべきことは [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
 

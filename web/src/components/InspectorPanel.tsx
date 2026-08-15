@@ -1,7 +1,7 @@
-import type { AwsNode, EnvId } from '../aws/types.ts';
-import { ENV_IDS } from '../aws/types.ts';
-import { MODULES } from '../aws/registry/index.ts';
-import { ICONS } from '../aws/icons.ts';
+import type { AwsNode, EnvId } from '@zuform/core/types';
+import { ENV_IDS } from '@zuform/core/types';
+import { MODULES } from '@zuform/core/registry';
+import { ICONS } from '../icons.ts';
 
 interface Props {
   node: AwsNode;

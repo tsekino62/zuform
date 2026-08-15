@@ -1,0 +1,11 @@
+{
+  "name": "@zuform/core",
+  "version": "0.0.1",
+  "exports": {
+    "./types": "./types.ts",
+    "./generator": "./generator.ts",
+    "./archfile": "./archfile.ts",
+    "./registry": "./registry/index.ts",
+    "./templates": "./templates.ts"
+  }
+}

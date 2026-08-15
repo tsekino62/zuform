@@ -17,8 +17,8 @@ import { s3Module } from './s3.ts';
  * 新しいサービスの追加手順:
  *   1. このディレクトリに ServiceModule 実装を1ファイル追加
  *   2. 下の配列に登録（配列の順序 = パレットとコード生成の出力順）
- *   3. src/aws/icons.ts にアイコンを追加
- *   4. src/aws/generator_test.ts にテストケースを追加
+ *   3. web/src/icons.ts にアイコンを追加
+ *   4. core/generator_test.ts にテストケースを追加
  */
 export const REGISTRY: ServiceModule[] = [
   apigatewayModule,

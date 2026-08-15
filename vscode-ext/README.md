@@ -31,8 +31,8 @@ YAMLの書式は、リポジトリルートの `README.md` の「アーキテク
 
 ## ビルド
 
-WebviewのUIはリポジトリルートのViteビルド成果物（`dist/`）を `vscode-ext/media/` にコピーして使います。
-YAMLの解釈・生成（`src/aws/archfile.ts`）もこのバンドルに含まれます。
+WebviewのUIはWebアプリのViteビルド成果物（`web/dist/`）を `vscode-ext/media/` にコピーして使います。
+YAMLの解釈・生成（`core/archfile.ts`）もこのバンドルに含まれます。
 
 ```bash
 # 1. リポジトリルートで UI をビルド
@@ -75,9 +75,9 @@ npx @vscode/vsce package --no-dependencies
 
 **テキストベース**のプロトコルです。拡張ホストはドキュメントの生テキストを運ぶだけで、
 YAML / JSON の中身を一切解釈しません。フォーマットの解釈・生成はすべてWebview側
-（`../src/aws/archfile.ts`）が担当します。
+（`../core/archfile.ts`）が担当します。
 
-Web側の実装は `../src/vscode.ts`、拡張側は `src/messages.ts` にあります。片方を変えたら両方直してください。
+Web側の実装は `../web/src/vscode.ts`、拡張側は `src/messages.ts` にあります。片方を変えたら両方直してください。
 
 | 方向 | メッセージ | 用途 |
 | --- | --- | --- |

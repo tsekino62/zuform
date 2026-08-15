@@ -5,7 +5,7 @@ Zuformへの貢献を検討いただきありがとうございます。この�
 ## 歓迎するコントリビューション
 
 - **新しいAWSサービスの追加**: ALB / ECS / Secrets Manager など、まだ対応していないAWSサービスのサポート（詳しくは後述の「新しいAWSサービスを追加する」を参照）
-- **テンプレート追加**: `src/flow/templates.ts` へのユースケース別テンプレートの追加・改善
+- **テンプレート追加**: `core/templates.ts` へのユースケース別テンプレートの追加・改善
 - **バグ報告**: 生成されるTerraformコードの誤り、UIの不具合、VSCode拡張の不具合など
 - **ドキュメント改善**: README / ROADMAP / このファイル自体の誤りの修正や分かりにくい箇所の改善
 
@@ -26,7 +26,7 @@ deno task dev
 | コマンド | 内容 |
 |---------|------|
 | `deno task dev` | 開発サーバー起動 |
-| `deno task build` | 本番ビルド（`dist/`） |
+| `deno task build` | 本番ビルド（`web/dist/`） |
 | `deno task test` | ジェネレータのテスト（スナップショット含む） |
 | `deno task test:update` | スナップショットの更新 |
 | `deno task check` | 型チェック |
@@ -40,11 +40,11 @@ deno task ext:build
 
 ## 新しいAWSサービスを追加する
 
-サービス1つにつき `src/aws/registry/` へ1ファイル追加する構成になっています。以下の手順で進めてください。
+サービス1つにつき `core/registry/` へ1ファイル追加する構成になっています。以下の手順で進めてください。
 
 1. **ServiceModuleの実装**
 
-   `src/aws/registry/` に新規ファイル（例: `alb.ts`）を作成し、既存のモジュール（例: `sqs.ts` や `dynamodb.ts`）を参考に `ServiceModule` を実装します。最低限、以下を定義します。
+   `core/registry/` に新規ファイル（例: `alb.ts`）を作成し、既存のモジュール（例: `sqs.ts` や `dynamodb.ts`）を参考に `ServiceModule` を実装します。最低限、以下を定義します。
 
    - `type` / `displayName` / `category` / `description`: パレット表示用の情報
    - `connectsTo`: このサービスから接続できる相手と、その接続が持つ意味（例: `lambda: 'キューに入ったメッセージをLambdaで処理します'`）
@@ -53,17 +53,17 @@ deno task ext:build
 
 2. **registryへの登録**
 
-   `src/aws/registry/index.ts` の `REGISTRY` 配列に、作成したモジュールをimportして追加します。配列の順序がパレット表示順・コード生成の出力順になります。
+   `core/registry/index.ts` の `REGISTRY` 配列に、作成したモジュールをimportして追加します。配列の順序がパレット表示順・コード生成の出力順になります。
 
 3. **アイコンの追加**
 
-   [AWS公式 Architecture Icons](https://aws.amazon.com/jp/architecture/icons/) から該当サービスのSVGを取得し、`src/assets/aws-icons/` に配置します。これらのアイコンはAWSの利用条件に従うものでプロジェクトのMITライセンスの対象外です。既存の [`NOTICE.md`](src/assets/aws-icons/NOTICE.md) の流儀（出典・ライセンス表記）に従ってください。追加後、`src/aws/icons.ts` の `ICONS` マップにインポートを追加します。
+   [AWS公式 Architecture Icons](https://aws.amazon.com/jp/architecture/icons/) から該当サービスのSVGを取得し、`web/src/assets/aws-icons/` に配置します。これらのアイコンはAWSの利用条件に従うものでプロジェクトのMITライセンスの対象外です。既存の [`NOTICE.md`](web/src/assets/aws-icons/NOTICE.md) の流儀（出典・ライセンス表記）に従ってください。追加後、`web/src/icons.ts` の `ICONS` マップにインポートを追加します。
 
    なお `icons.ts` はUI専用モジュールです。`deno test` はSVGを読み込めないため、`registry/` 配下（コード生成ロジック）から `icons.ts` をimportしないよう注意してください。
 
 4. **テストの追加**
 
-   `src/aws/generator_test.ts` に、新しいサービス単体および既存サービスとの接続を含むテストケースを追加し、`deno task test` を実行します。生成コードの内容を確認したい場合はスナップショットテスト（`assertSnapshot`）を使うと確認・レビューがしやすくなります。
+   `core/generator_test.ts` に、新しいサービス単体および既存サービスとの接続を含むテストケースを追加し、`deno task test` を実行します。生成コードの内容を確認したい場合はスナップショットテスト（`assertSnapshot`）を使うと確認・レビューがしやすくなります。
 
 5. **可能であればfixturesとterraform validateの確認**
 
@@ -78,7 +78,7 @@ terraform validate
 
 ## テスト方針
 
-- 新機能・新サービスには対応するテストを必ず追加してください（`src/aws/generator_test.ts` など）。
+- 新機能・新サービスには対応するテストを必ず追加してください（`core/generator_test.ts` など）。
 - スナップショットを更新する場合は `deno task test:update` を使用してください。
 - **生成されるTerraformコードが変わる変更**（既存サービスのHCLテンプレート修正など）は、PRの説明にスナップショットのdiffを含め、何がどう変わったか・なぜ変わったかを説明してください。レビュアーが生成結果の変化を把握しやすくなります。
 

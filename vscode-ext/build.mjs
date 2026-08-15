@@ -1,4 +1,4 @@
-// 拡張ホスト側（Node）のバンドル。Webview側はルートのViteビルドを使う。
+// 拡張ホスト側（Node）のバンドル。Webview側は web/ のViteビルドを使う。
 import { build, context } from 'esbuild';
 
 const watch = process.argv.includes('--watch');

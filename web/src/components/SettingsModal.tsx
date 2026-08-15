@@ -1,5 +1,5 @@
-import type { NamingConfig } from '../aws/types.ts';
-import { applyNamingPattern, toKebabName } from '../aws/generator.ts';
+import type { NamingConfig } from '@zuform/core/types';
+import { applyNamingPattern, toKebabName } from '@zuform/core/generator';
 
 interface Props {
   naming: NamingConfig;

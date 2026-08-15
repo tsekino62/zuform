@@ -22,9 +22,9 @@ import type {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import { CONNECTION_RULES, connectionKey, MODULES } from './aws/registry/index.ts';
-import type { AwsNode, AwsNodeData, EnvId, NamingConfig, ServiceType } from './aws/types.ts';
-import { DEFAULT_NAMING } from './aws/types.ts';
+import { CONNECTION_RULES, connectionKey, MODULES } from '@zuform/core/registry';
+import type { AwsNode, AwsNodeData, EnvId, NamingConfig, ServiceType } from '@zuform/core/types';
+import { DEFAULT_NAMING } from '@zuform/core/types';
 import { Sidebar } from './components/Sidebar.tsx';
 import { AwsServiceNode } from './components/AwsServiceNode.tsx';
 import { VpcGroupNode } from './components/VpcGroupNode.tsx';
@@ -32,7 +32,7 @@ import { CodePanel } from './components/CodePanel.tsx';
 import { InspectorPanel } from './components/InspectorPanel.tsx';
 import { SettingsModal } from './components/SettingsModal.tsx';
 import { TemplateGallery } from './components/TemplateGallery.tsx';
-import type { DiagramTemplate } from './flow/templates.ts';
+import type { DiagramTemplate } from '@zuform/core/templates';
 import {
   isInVsCode,
   onInit,

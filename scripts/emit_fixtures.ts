@@ -4,9 +4,9 @@
  *
  * 使い方: deno run -A scripts/emit_fixtures.ts [出力先ディレクトリ]
  */
-import { generateForEnv } from '../src/aws/generator.ts';
-import { TEMPLATES } from '../src/flow/templates.ts';
-import { DEFAULT_NAMING, ENV_IDS } from '../src/aws/types.ts';
+import { generateForEnv } from '@zuform/core/generator';
+import { TEMPLATES } from '@zuform/core/templates';
+import { DEFAULT_NAMING, ENV_IDS } from '@zuform/core/types';
 
 const outDir = Deno.args[0] ?? 'fixtures';
 let count = 0;

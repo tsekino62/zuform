@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { TEMPLATES, USE_CASES, type DiagramTemplate } from '../flow/templates.ts';
-import { ICONS } from '../aws/icons.ts';
+import { TEMPLATES, USE_CASES, type DiagramTemplate } from '@zuform/core/templates';
+import { ICONS } from '../icons.ts';
 
 interface Props {
   onSelect: (template: DiagramTemplate) => void;

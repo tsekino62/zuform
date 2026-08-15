@@ -1,8 +1,8 @@
 import { NodeResizer } from '@xyflow/react';
 import type { Node, NodeProps } from '@xyflow/react';
-import type { AwsNodeData } from '../aws/types.ts';
-import { ENV_IDS } from '../aws/types.ts';
-import { ICONS } from '../aws/icons.ts';
+import type { AwsNodeData } from '@zuform/core/types';
+import { ENV_IDS } from '@zuform/core/types';
+import { ICONS } from '../icons.ts';
 
 export function VpcGroupNode({ data, selected }: NodeProps<Node<AwsNodeData>>) {
   const restricted = data.envs && data.envs.length < ENV_IDS.length;

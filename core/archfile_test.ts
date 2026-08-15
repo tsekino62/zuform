@@ -3,7 +3,7 @@ import { ArchParseError, parseArchYaml, serializeArchYaml } from './archfile.ts'
 import { generateForEnv } from './generator.ts';
 import { DEFAULT_NAMING } from './types.ts';
 import type { AwsNode } from './types.ts';
-import { TEMPLATES } from '../flow/templates.ts';
+import { TEMPLATES } from './templates.ts';
 
 const SAMPLE_YAML = `
 version: 1

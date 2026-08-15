@@ -10,7 +10,7 @@ import {
 import { DEFAULT_NAMING } from './types.ts';
 import type { AwsNode } from './types.ts';
 import { CONNECTION_RULES } from './registry/index.ts';
-import { TEMPLATES } from '../flow/templates.ts';
+import { TEMPLATES } from './templates.ts';
 
 function tpl(id: string): { nodes: AwsNode[]; edges: { id: string; source: string; target: string }[] } {
   const t = TEMPLATES.find((t) => t.id === id);

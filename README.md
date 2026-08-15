@@ -1,6 +1,8 @@
 # Zuform
 
 [![CI](https://github.com/tsekino62/zuform/actions/workflows/ci.yml/badge.svg)](https://github.com/tsekino62/zuform/actions/workflows/ci.yml)
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/tsekino62.zuform-vscode?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=tsekino62.zuform-vscode)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 [English](README.en.md)
 
@@ -136,7 +138,11 @@ layout:                 # 図の座標（省略可）。vpcは [x, y, 幅, 高�
 
 YAMLをテキストエディタで直接書き換えるとキャンバスへ即座に反映され、キャンバスで編集するとYAMLが書き換わります（双方向編集）。ビルドとデバッグ手順は [vscode-ext/README.md](vscode-ext/README.md) を参照。
 
-現在は `.vsix` の手動インストールのみ対応です。Marketplace公開はIssue #4で対応中です。
+[VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=tsekino62.zuform-vscode) で公開しています。VS Codeの拡張機能タブで「Zuform」を検索するか、次のコマンドでインストールできます。
+
+```bash
+code --install-extension tsekino62.zuform-vscode
+```
 
 ```bash
 deno task ext:build

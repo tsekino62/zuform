@@ -1,4 +1,7 @@
-# Zuform — VSCode拡張（プロトタイプ）
+# Zuform — VSCode拡張
+
+[Marketplaceで公開中](https://marketplace.visualstudio.com/items?itemName=tsekino62.zuform-vscode) — `code --install-extension tsekino62.zuform-vscode`
+
 
 `*.awsarch.yaml`（アーキテクチャ定義ファイル）を **Zuform のキャンバスUI** で開くカスタムエディタです。
 図を編集するとファイルのYAMLが書き換わり、`Ctrl+S` で通常のファイルとして保存できます。

@@ -138,7 +138,11 @@ When you sketch an architecture by hand, you never have to think about coordinat
 
 Editing the YAML in a text editor updates the canvas immediately, and editing the canvas rewrites the YAML — it is bidirectional. See [vscode-ext/README.md](vscode-ext/README.md) for build and debug instructions.
 
-Currently supports manual `.vsix` installation only. Marketplace publishing is tracked in Issue #4.
+Available on the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=tsekino62.zuform-vscode). Search for "Zuform" in the Extensions tab, or run:
+
+```bash
+code --install-extension tsekino62.zuform-vscode
+```
 
 ```bash
 deno task ext:build

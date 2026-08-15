@@ -1,6 +1,8 @@
 # Zuform
 
 [![CI](https://github.com/tsekino62/zuform/actions/workflows/ci.yml/badge.svg)](https://github.com/tsekino62/zuform/actions/workflows/ci.yml)
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/tsekino62.zuform-vscode?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=tsekino62.zuform-vscode)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 [日本語](README.md)
 

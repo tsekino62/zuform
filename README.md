@@ -1,10 +1,16 @@
 # Zuform
 
+[![CI](https://github.com/tsekino62/zuform/actions/workflows/ci.yml/badge.svg)](https://github.com/tsekino62/zuform/actions/workflows/ci.yml)
+
+[English](README.en.md)
+
 名前の由来: 図(zu) × form。図(zu)からTerraformを生成するツールという意味です。
 
 AWSのリソースを **draw.io のような画面でドラッグ&ドロップ配置** し、アイコン同士を矢印でつなぐと **DEV / STG / PRD 3環境分のTerraformコードを自動生成** する初心者向けWebツールです。
 
 ![アーキテクチャ図からTerraformを生成](docs/screenshot.png)
+
+**ライブデモ: <https://tsekino62.github.io/zuform/>**（インストール不要。ブラウザだけで試せます）
 
 ## できること
 
@@ -26,6 +32,7 @@ AWSのリソースを **draw.io のような画面でドラッグ&ドロップ�
   - 環境プロファイル: DEVは小さく安く（`db.t3.micro`・削除保護なし）、PRDは堅牢に（マルチAZ・削除保護・7日バックアップ）
   - `environments/{dev,stg,prd}/main.tf` 構成のZIP一括ダウンロード（tfstateが環境ごとに分離）
 - 図を **アーキテクチャ定義ファイル（`*.awsarch.yaml`）** として保存/読み込み、ブラウザへの自動保存
+- **UIの日本語/英語切替**（ヘッダーのボタンで即時切替。選んだ言語はブラウザに記憶されます）
 
 アイコンは [AWS公式 Architecture Icons](https://aws.amazon.com/jp/architecture/icons/) を使用しています（[NOTICE](web/src/assets/aws-icons/NOTICE.md)）。
 
@@ -183,7 +190,8 @@ zuform/
    - パレット表示情報・接続ルール（`connectsTo`）・HCL生成（`generate`）・出力（`outputs`）
 2. `core/registry/index.ts` の配列に登録
 3. `web/src/icons.ts` に公式アイコンを追加
-4. `core/generator_test.ts` にテストケースを追加して `deno task test`
+4. `web/src/i18n.ts` の `serviceDescriptions` にサービス説明の英訳を追加
+5. `core/generator_test.ts` にテストケースを追加して `deno task test`
 
 詳しい手順やPRの前に確認すべきことは [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
 
@@ -194,7 +202,10 @@ GitHub Actions（[.github/workflows/ci.yml](.github/workflows/ci.yml)）で以�
 1. `deno task check` / `deno task test` / `deno task build`
 2. 全テンプレート×全環境（21ファイル）の生成コードを `terraform validate` で検証
 
-今後の予定は [ROADMAP.md](ROADMAP.md) を参照（VSCode拡張化、ヒントの観点プロファイル、ALB/ECS追加など）。
+`main` への push では [pages.yml](.github/workflows/pages.yml) がライブデモ（GitHub Pages）を更新します。
+
+今後の予定は [GitHub Issues](https://github.com/tsekino62/zuform/issues) と
+[Milestones](https://github.com/tsekino62/zuform/milestones) で管理しています（概要は [ROADMAP.md](ROADMAP.md)）。
 
 ## 注意
 

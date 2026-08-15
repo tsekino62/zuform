@@ -5,6 +5,8 @@ import { generateAll } from '@zuform/core/generator';
 import type { AwsNode, EnvId, NamingConfig } from '@zuform/core/types';
 import { ENV_IDS } from '@zuform/core/types';
 import { isInVsCode, postWriteFiles } from '../vscode.ts';
+import { CUSTOM_TF, ENVIRONMENTS_README } from '../generatedFiles.ts';
+import { useLang } from '../i18n.ts';
 
 /** VSCodeのWebview内で動いているか（起動時に一度だけ判定する） */
 const IN_VSCODE = isInVsCode();
@@ -52,6 +54,7 @@ function downloadBlob(blob: Blob, filename: string) {
 }
 
 export function CodePanel({ nodes, edges, naming }: Props) {
+  const { t } = useLang();
   const [env, setEnv] = useState<EnvId>('dev');
   const [tab, setTab] = useState<'code' | 'hints'>('code');
   const [copied, setCopied] = useState(false);
@@ -79,48 +82,12 @@ export function CodePanel({ nodes, edges, naming }: Props) {
    * ブラウザではZIPに、VSCodeではワークスペースの terraform/ 配下に展開される。
    */
   const buildFiles = (): Record<string, string> => {
-    const customTf = [
-      '# ============================================================',
-      '# custom.tf — 自分の追記用ファイル（Zuformは上書きしません）',
-      '#',
-      '# Terraformは同じディレクトリの .tf ファイルをすべて読み込んで',
-      '# 結合するため、main.tf に手を入れずにここへ追加できます。',
-      '# 図を更新して main.tf を再生成しても、このファイルは無傷です。',
-      '#',
-      '# 生成済みリソースの「属性だけ」変えたい場合は override が便利:',
-      '#   main_override.tf というファイルを作り、同名のresourceブロックで',
-      '#   変えたい属性だけを書くと、その属性だけが上書きされます。',
-      '#   例: RDSのサイズだけ変更する',
-      '#     resource "aws_db_instance" "users_db" {',
-      '#       instance_class = "db.r6g.large"',
-      '#     }',
-      '# ============================================================',
-      '',
-    ].join('\n');
     const files: Record<string, string> = {
-      'environments/README.md': [
-        '# 環境別Terraform',
-        '',
-        'Zuform で生成された環境別のコードです。',
-        '',
-        '```',
-        'environments/',
-        ...ENV_IDS.map((e) => `├── ${e}/  (main.tf + custom.tf)`),
-        '```',
-        '',
-        '各環境のディレクトリに移動して terraform init / plan / apply を実行してください。',
-        '環境ごとにtfstateが分かれるため、DEVでの試行錯誤が本番に影響しません。',
-        '',
-        '## 手で編集したい場合',
-        '',
-        '- `main.tf` はツールが再生成するファイルです。直接編集は避けてください',
-        '- 追加のリソースや設定は各環境の `custom.tf` に書いてください（再生成の影響を受けません）',
-        '- 生成済みリソースの属性変更は `main_override.tf`（override機能）が使えます',
-      ].join('\n'),
+      'environments/README.md': ENVIRONMENTS_README,
     };
     for (const e of ENV_IDS) {
       files[`environments/${e}/main.tf`] = results[e].code;
-      files[`environments/${e}/custom.tf`] = customTf;
+      files[`environments/${e}/custom.tf`] = CUSTOM_TF;
     }
     return files;
   };
@@ -160,13 +127,13 @@ export function CodePanel({ nodes, edges, naming }: Props) {
             type="button"
             className="btn btn--accent code-panel__zip"
             onClick={writeToWorkspace}
-            title="ワークスペースの terraform/ 配下に全環境のコードを書き出します"
+            title={t('code.writeToWorkspaceTitle')}
           >
-            ⬇ ワークスペースへ書き出し
+            ⬇ {t('code.writeToWorkspace')}
           </button>
         ) : (
           <button type="button" className="btn btn--accent code-panel__zip" onClick={downloadZip}>
-            ⬇ 全環境ZIP
+            ⬇ {t('code.zipAll')}
           </button>
         )}
       </div>
@@ -178,20 +145,20 @@ export function CodePanel({ nodes, edges, naming }: Props) {
             className={`code-tab${tab === 'code' ? ' is-active' : ''}`}
             onClick={() => setTab('code')}
           >
-            main.tf
+            {t('code.tabCode')}
           </button>
           <button
             type="button"
             className={`code-tab${tab === 'hints' ? ' is-active' : ''}`}
             onClick={() => setTab('hints')}
           >
-            ヒント
+            {t('code.tabHints')}
             {hints.length > 0 && <span className="code-tab__badge">{hints.length}</span>}
           </button>
         </div>
         <div className="code-panel__actions">
           <button type="button" className="btn btn--ghost" onClick={copy}>
-            {copied ? '✓ コピーしました' : 'コピー'}
+            {copied ? `✓ ${t('code.copied')}` : t('code.copy')}
           </button>
           <button type="button" className="btn btn--ghost" onClick={downloadCurrent}>
             ⬇ {env}.main.tf
@@ -207,9 +174,9 @@ export function CodePanel({ nodes, edges, naming }: Props) {
         <div className="code-panel__hints">
           {hints.length === 0 ? (
             <p className="hint-empty">
-              {env.toUpperCase()} 環境に問題は見つかりませんでした。
+              {t('code.hintsEmptyTitle', { env: env.toUpperCase() })}
               <br />
-              このままコードをダウンロードして使えます。
+              {t('code.hintsEmptyBody')}
             </p>
           ) : (
             hints.map((h, i) => (
@@ -220,19 +187,21 @@ export function CodePanel({ nodes, edges, naming }: Props) {
             ))
           )}
           <div className="hint-static">
-            <h3>使い方</h3>
+            <h3>{t('code.howToTitle')}</h3>
             <ol>
-              <li>左のパレットからアイコンをキャンバスへドラッグ</li>
-              <li>アイコン右端の丸をドラッグして別のアイコンにつなぐ</li>
-              <li>RDSはVPCの枠の中に配置する</li>
-              <li>ノードを選択して「作成する環境」を切り替え（DEVだけ・PRDだけ等）</li>
-              <li>「⬇ 全環境ZIP」で DEV / STG / PRD 一式をダウンロード</li>
+              <li>{t('code.howTo1')}</li>
+              <li>{t('code.howTo2')}</li>
+              <li>{t('code.howTo3')}</li>
+              <li>{t('code.howTo4')}</li>
+              <li>{t('code.howTo5')}</li>
               <li>
-                各環境のディレクトリで <code>terraform init</code> → <code>plan</code> →{' '}
-                <code>apply</code>
+                {t('code.howTo6Lead')}
+                <code>terraform init</code> → <code>plan</code> → <code>apply</code>
               </li>
               <li>
-                手での追記は同梱の <code>custom.tf</code> へ（main.tfは再生成で上書きされます）
+                {t('code.howTo7Lead')}
+                <code>custom.tf</code>
+                {t('code.howTo7Tail')}
               </li>
             </ol>
           </div>

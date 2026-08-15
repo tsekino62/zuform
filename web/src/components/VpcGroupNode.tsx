@@ -3,8 +3,10 @@ import type { Node, NodeProps } from '@xyflow/react';
 import type { AwsNodeData } from '@zuform/core/types';
 import { ENV_IDS } from '@zuform/core/types';
 import { ICONS } from '../icons.ts';
+import { useLang } from '../i18n.ts';
 
 export function VpcGroupNode({ data, selected }: NodeProps<Node<AwsNodeData>>) {
+  const { t } = useLang();
   const restricted = data.envs && data.envs.length < ENV_IDS.length;
   return (
     <div className={`vpc-node${selected ? ' is-selected' : ''}`}>
@@ -25,7 +27,7 @@ export function VpcGroupNode({ data, selected }: NodeProps<Node<AwsNodeData>>) {
             </span>
           ))}
       </div>
-      <div className="vpc-node__hint">この枠の中にリソースをドラッグ</div>
+      <div className="vpc-node__hint">{t('node.vpcHint')}</div>
     </div>
   );
 }

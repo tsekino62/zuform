@@ -1,57 +1,23 @@
 # ROADMAP
 
-OSS公開に向けたバックログ。優先度は 高 / 中 / 低 / 研究 の4段階。
+進行管理は **GitHub Issues / Milestones** へ移行しました。
+このファイルは入口だけを示すポインタです（個別の起票・議論はIssueで行ってください）。
 
-## 高: 編集体験
+## いま追いかけている場所
 
-- [x] **custom.tf の同梱**: ZIPに追記用 `custom.tf` と override の使い方ガイドを同梱（main.tf再生成と手編集の共存）
-- [x] **ノード単位の追加HCL欄**: インスペクタの「追加HCL」テキストエリアから主リソースブロック末尾に挿入。図JSONに保存されるため再生成しても消えない
-- [x] **VSCode拡張化（プロトタイプ）**: `vscode-ext/` に実装済み。`*.awsdiagram.json` のカスタムエディタ + Webview + `terraform/` への書き出し（custom.tf保護付き）。vsixパッケージ生成まで確認済み
-  - [ ] 実機（VSCode）での動作確認とフィードバック反映 ← 次のステップ
-  - [ ] Marketplace公開（publisher登録、LICENSE、リポジトリURL設定）
+- [Issues 一覧](https://github.com/tsekino62/zuform/issues) — 起票された課題・要望
+- [Milestones 一覧](https://github.com/tsekino62/zuform/milestones) — 下記3本で優先度を管理
 
-## 中: OSS体裁
+| マイルストーン | 内容 |
+|---------------|------|
+| **v0.2 OSS公開整備** | ライブデモ公開、UIの英語化、ドキュメント整備、VSCode拡張の実機確認 |
+| **v0.3 サービス拡充** | ALB / ECS・Fargate / Secrets Manager / Route 53 / Cognito など対応サービスの追加 |
+| **Backlog** | ヒントの観点プロファイル、YAMLコメント保持、tf→図の逆生成、コスト概算などの研究テーマ |
 
-- [x] **名称変更**: 「AWS Builder」はAWS商標をプロダクト名に含むため公開前に改名 → **Zuform**（図(zu)×form）に決定・適用済み
-- [ ] **UIの英語化（i18n）**: UI文字列の辞書化 + 言語切替。生成コード内の日本語コメントの扱いは要検討（ロケール別コメント or 英語固定）
-- [x] CONTRIBUTING.md（サービス追加手順はREADMEに記載済み）、Issue/PRテンプレート
-- [ ] GitHub Pagesでのライブデモ公開
-  - リポジトリはprivate運用中のため保留。publicに切り替えたら `actions/configure-pages` + `actions/upload-pages-artifact` + `actions/deploy-pages` のworkflowを追加するだけ（vite buildの `web/dist/` を配信、`base: './'` 設定済みなので追加設定不要）
+## これまでの主な完了実績
 
-## 中: サービス拡充
-
-- [ ] ALB（→ EC2 / ECS のターゲット接続）
-- [ ] ECS / Fargate（コンテナ実行。タスク定義・サービス・ALB連携）
-- [ ] Secrets Manager（RDSパスワードの受け皿。Lambda→参照権限）
-- [ ] Route 53（独自ドメイン + CloudFront/ALBへのエイリアス）
-- [ ] Cognito（API Gatewayのオーソライザー接続）
-- [ ] Aurora / ElastiCache
-
-## 低: ヒントの観点プロファイル（ユーザー要望・優先度指定は最低）
-
-用途によって「正しい構成」が変わることへの対応。社内ツールならHA不要、公開サービスならHA必須など。
-
-- [ ] **プロジェクトの観点設定**: 設定モーダルに観点スライダー/セレクタを追加
-  - 高可用性（HA）重視 ←→ コスト重視
-  - セキュリティ厳格 ←→ 検証優先
-  - レスポンス速度重視（コールドスタート許容度）
-- [ ] **観点に応じたヒント切替**: 例
-  - HA重視: 「RDSがシングルAZです。multi_az を有効にしましょう」
-  - コスト重視: 「社内ツールならマルチAZは過剰かもしれません」
-  - レスポンス重視: 「常時低レイテンシが必要ならLambda（コールドスタートあり）よりEC2/ECS常駐が向きます」
-- [ ] **ヒントの個別無視（dismiss）**: ヒントごとに「このプロジェクトでは表示しない」ボタン。図JSONに無視リストを保存
-- [ ] 観点による生成分岐（例: HA重視ならDEVでもmulti_az、セキュリティ厳格ならSSH開放をCIDR必須に）
-
-## 完了: アーキテクチャ定義ファイル（*.awsarch.yaml）
-
-- [x] 人間が読み書きできるYAML宣言形式を正とするアダプタ層（resources / connections / in / envs / extra_hcl / layout）
-- [x] layout省略時のdagre自動レイアウト
-- [x] Web版: 保存/読み込みのYAML化（旧JSONも読み込み可）
-- [x] VSCode拡張: *.awsarch.yaml のカスタムエディタ化、テキスト⇄キャンバス双方向編集（パースエラー中は同期停止でファイル破壊を防止）
-- [ ] キャンバス編集時のYAMLコメント保持（現状は書き戻しで正規化されコメントが消える）
-
-## 研究
-
-- [ ] **tf → 図の逆生成**: HCL解析が必要で難易度高。対応サービス限定のlossyインポート（@cdktf/hcl2json利用）なら現実的。awsarch.yaml の導入によりニーズは低下
-- [ ] 既存AWS環境のインポート（former2的アプローチ）
-- [ ] コスト概算表示（各ノードの月額目安）
+- **アーキテクチャ定義ファイル（`*.awsarch.yaml`）**: 人が読み書きできるYAML宣言形式を正とし、`layout` 省略時はdagreで自動レイアウト
+- **DEV / STG / PRD の3環境生成**: ノード単位の環境選択と環境プロファイル、`environments/{dev,stg,prd}/` 一括ダウンロード
+- **手編集との共存**: ノードの「追加HCL」欄・同梱 `custom.tf`・override による、再生成しても消えない編集手段
+- **VSCode拡張（プロトタイプ）**: カスタムエディタでのテキスト⇄キャンバス双方向編集と、ワークスペースへの書き出し
+- **OSS体裁**: 「AWS Builder」から **Zuform** へ改名、CI（型チェック・テスト・`terraform validate`）、CONTRIBUTING・Issue/PRテンプレート整備

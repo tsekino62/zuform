@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { TEMPLATES, USE_CASES, type DiagramTemplate } from '@zuform/core/templates';
 import { ICONS } from '../icons.ts';
+import {
+  LEVEL_EASY,
+  levelLabel,
+  templateDescription,
+  templateTitle,
+  useCaseLabel,
+  useLang,
+} from '../i18n.ts';
 
 interface Props {
   onSelect: (template: DiagramTemplate) => void;
@@ -8,15 +16,21 @@ interface Props {
 }
 
 export function TemplateGallery({ onSelect, onClose }: Props) {
+  const { lang, t } = useLang();
   const [useCase, setUseCase] = useState<string | null>(null);
-  const shown = useCase ? TEMPLATES.filter((t) => t.useCase === useCase) : TEMPLATES;
+  const shown = useCase ? TEMPLATES.filter((tpl) => tpl.useCase === useCase) : TEMPLATES;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
         <div className="modal__head">
-          <h2>テンプレートから始める</h2>
-          <button type="button" className="modal__close" onClick={onClose}>
+          <h2>{t('gallery.title')}</h2>
+          <button
+            type="button"
+            className="modal__close"
+            onClick={onClose}
+            aria-label={t('common.close')}
+          >
             ×
           </button>
         </div>
@@ -27,7 +41,7 @@ export function TemplateGallery({ onSelect, onClose }: Props) {
             className={`filter-chip${useCase === null ? ' is-active' : ''}`}
             onClick={() => setUseCase(null)}
           >
-            すべて
+            {t('gallery.filterAll')}
           </button>
           {USE_CASES.map((uc) => (
             <button
@@ -36,28 +50,35 @@ export function TemplateGallery({ onSelect, onClose }: Props) {
               className={`filter-chip${useCase === uc ? ' is-active' : ''}`}
               onClick={() => setUseCase(uc)}
             >
-              {uc}
+              {useCaseLabel(lang, uc)}
             </button>
           ))}
         </div>
 
         <div className="gallery__grid">
-          {shown.map((t) => (
-            <button type="button" key={t.id} className="template-card" onClick={() => onSelect(t)}>
+          {shown.map((tpl) => (
+            <button
+              type="button"
+              key={tpl.id}
+              className="template-card"
+              onClick={() => onSelect(tpl)}
+            >
               <div className="template-card__head">
-                <span className={`level-badge level-badge--${t.level === '入門' ? 'easy' : 'mid'}`}>
-                  {t.level}
+                <span
+                  className={`level-badge level-badge--${tpl.level === LEVEL_EASY ? 'easy' : 'mid'}`}
+                >
+                  {levelLabel(lang, tpl.level)}
                 </span>
-                <span className="template-card__usecase">{t.useCase}</span>
+                <span className="template-card__usecase">{useCaseLabel(lang, tpl.useCase)}</span>
               </div>
-              <h3>{t.title}</h3>
+              <h3>{templateTitle(lang, tpl.id, tpl.title)}</h3>
               <div className="template-card__icons">
-                {t.services.map((s) => (
+                {tpl.services.map((s) => (
                   <img key={s} src={ICONS[s]} alt="" />
                 ))}
               </div>
-              <p>{t.description}</p>
-              <span className="template-card__cta">この構成を使う →</span>
+              <p>{templateDescription(lang, tpl.id, tpl.description)}</p>
+              <span className="template-card__cta">{t('gallery.cta')}</span>
             </button>
           ))}
         </div>

@@ -29,6 +29,8 @@ import type { Edge } from '@xyflow/react';
 import type { AwsNode, NamingConfig } from '@zuform/core/types';
 import { DEFAULT_NAMING } from '@zuform/core/types';
 import { parseArchYaml, serializeArchYaml } from '@zuform/core/archfile';
+import { t } from './i18n.ts';
+import type { Lang } from './i18n.ts';
 
 /** ドキュメントの記法。拡張側はファイル名から判定して init に載せてくる */
 export type DocumentLanguage = 'yaml' | 'json';
@@ -77,17 +79,24 @@ export type ToWebviewMessage = { type: 'init'; text: string; language: DocumentL
 
 /**
  * ドキュメントのテキストを図として読む。
- * 致命的な問題があれば Error（日本語メッセージ）を投げるので、
+ * 致命的な問題があれば Error を投げるので、
  * 呼び出し側でキャンバスを壊さないように扱うこと。
+ *
+ * `uiLang` は旧JSON形式のエラーメッセージの言語。
+ * YAML（archfile）側のメッセージは core が組み立てるため常に日本語になる。
  */
-export function parseDiagramText(text: string, language: DocumentLanguage): ParsedDiagram {
+export function parseDiagramText(
+  text: string,
+  language: DocumentLanguage,
+  uiLang: Lang = 'ja',
+): ParsedDiagram {
   // YAML側は archfile が空文字・空ドキュメントも空モデルとして扱う
   if (language === 'yaml') return parseArchYaml(text);
-  return parseDiagramJson(text);
+  return parseDiagramJson(text, uiLang);
 }
 
 /** 旧形式（React Flowの内部形式をそのままダンプしたJSON）を読む */
-function parseDiagramJson(text: string): ParsedDiagram {
+function parseDiagramJson(text: string, uiLang: Lang): ParsedDiagram {
   if (text.trim() === '') {
     // 新規作成直後の空ファイル。空の図として開く
     return { nodes: [], edges: [], naming: DEFAULT_NAMING, warnings: [] };
@@ -98,16 +107,16 @@ function parseDiagramJson(text: string): ParsedDiagram {
     parsed = JSON.parse(text);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`構成図のJSON構文が不正です: ${detail}`);
+    throw new Error(t(uiLang, 'doc.jsonSyntaxInvalid', { detail }));
   }
 
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error('構成図のJSONはオブジェクト形式で記述してください');
+    throw new Error(t(uiLang, 'doc.jsonNotObject'));
   }
 
   const doc = parsed as Partial<DiagramDocument>;
   if (!Array.isArray(doc.nodes) || !Array.isArray(doc.edges)) {
-    throw new Error('構成図のJSONに nodes / edges の配列が見つかりません');
+    throw new Error(t(uiLang, 'doc.jsonMissingArrays'));
   }
 
   return {

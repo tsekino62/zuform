@@ -11,6 +11,7 @@ import {
   sanitizeDiagram,
   serializeDiagramText,
 } from './vscode.ts';
+import { t } from './i18n.ts';
 
 function sampleNode(): AwsNode {
   return {
@@ -126,12 +127,20 @@ Deno.test('parseDiagramText(json): 壊れたJSON・nodes欠落はエラー（日
   assertThrows(
     () => parseDiagramText('{ "nodes": [', 'json'),
     Error,
-    '構成図のJSON構文が不正です',
+    t('ja', 'doc.jsonSyntaxInvalid', { detail: '' }),
   );
   assertThrows(
     () => parseDiagramText('{ "edges": [] }', 'json'),
     Error,
-    'nodes / edges の配列が見つかりません',
+    t('ja', 'doc.jsonMissingArrays'),
+  );
+});
+
+Deno.test('parseDiagramText(json): UI言語が en ならエラーメッセージも英語になる', () => {
+  assertThrows(
+    () => parseDiagramText('{ "edges": [] }', 'json', 'en'),
+    Error,
+    t('en', 'doc.jsonMissingArrays'),
   );
 });
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent, ChangeEvent } from 'react';
 import {
   ReactFlow,
@@ -42,6 +42,15 @@ import {
   serializeDiagramText,
 } from './vscode.ts';
 import type { DocumentLanguage, ParsedDiagram } from './vscode.ts';
+import {
+  detectInitialLang,
+  LangContext,
+  persistLang,
+  t as translate,
+  templateTitle,
+  useLang,
+} from './i18n.ts';
+import type { Lang, LangContextValue, MessageKey, TemplateVars } from './i18n.ts';
 import './App.css';
 
 /** VSCodeのWebview内で動いているか（起動時に一度だけ判定する） */
@@ -89,16 +98,22 @@ function detectLanguage(fileName: string, text: string): DocumentLanguage {
   return text.trimStart().startsWith('{') ? 'json' : 'yaml';
 }
 
-/** 例外から利用者に見せるメッセージを取り出す */
-function documentErrorMessage(error: unknown): string {
-  return error instanceof Error && error.message !== '' ? error.message : '原因不明のエラー';
+/** 現在の言語で文言を引く関数（LangContext から受け取る t の型） */
+type Translate = (key: MessageKey, vars?: TemplateVars) => string;
+
+/**
+ * 例外から利用者に見せるメッセージを取り出す。
+ * core（ArchParseError）由来の本文は日本語のまま、そのまま見せる。
+ */
+function documentErrorMessage(error: unknown, t: Translate): string {
+  return error instanceof Error && error.message !== '' ? error.message : t('doc.unknownError');
 }
 
 /** 警告一覧をトースト1行にまとめる（全文はキャンバスに出さず件数＋先頭だけ見せる） */
-function warningSummary(warnings: string[]): string {
+function warningSummary(warnings: string[], t: Translate): string {
   return warnings.length === 1
-    ? `警告: ${warnings[0]}`
-    : `警告${warnings.length}件: ${warnings[0]} ほか`;
+    ? t('toast.warningOne', { message: warnings[0] })
+    : t('toast.warningMany', { count: warnings.length, message: warnings[0] });
 }
 
 function loadSaved(): SavedState | null {
@@ -134,6 +149,7 @@ function nodeSize(node: AwsNode): { w: number; h: number } {
 }
 
 function FlowEditor() {
+  const { lang, setLang, t } = useLang();
   const [nodes, setNodes, onNodesChange] = useNodesState<AwsNode>(saved?.nodes ?? []);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(saved?.edges ?? []);
   const [naming, setNaming] = useState<NamingConfig>(saved?.naming ?? DEFAULT_NAMING);
@@ -159,6 +175,15 @@ function FlowEditor() {
    */
   const parseErrorRef = useRef(false);
 
+  /**
+   * init ハンドラの中から最新の言語を参照するための箱。
+   * 言語切替のたびに拡張への購読を張り直す（= ドキュメントを読み直す）のを避ける。
+   */
+  const langRef = useRef({ lang, t });
+  useEffect(() => {
+    langRef.current = { lang, t };
+  }, [lang, t]);
+
   const showToast = useCallback((message: string) => {
     setToast(message);
     globalThis.clearTimeout(toastTimer.current);
@@ -176,16 +201,17 @@ function FlowEditor() {
     if (!IN_VSCODE) return;
     const dispose = onInit((text, language) => {
       languageRef.current = language;
+      const { lang: uiLang, t: translateNow } = langRef.current;
 
       let parsed: ParsedDiagram;
       try {
-        parsed = parseDiagramText(text, language);
+        parsed = parseDiagramText(text, language, uiLang);
       } catch (error) {
         // ★重要: パースに失敗してもキャンバスは最後の正常な状態のまま維持し、
         // ドキュメントへの同期も止める。ユーザーがテキストエディタでYAMLを
         // 直している最中に、キャンバス側の内容で上書きして壊さないため。
         parseErrorRef.current = true;
-        setDocError(documentErrorMessage(error));
+        setDocError(documentErrorMessage(error, translateNow));
         return;
       }
 
@@ -199,7 +225,7 @@ function FlowEditor() {
       setNodes(sortParentsFirst(parsed.nodes));
       setEdges(parsed.edges.map((edge) => ({ ...defaultEdgeOptions, ...edge })));
       setNaming({ ...DEFAULT_NAMING, ...parsed.naming });
-      if (parsed.warnings.length > 0) showToast(warningSummary(parsed.warnings));
+      if (parsed.warnings.length > 0) showToast(warningSummary(parsed.warnings, translateNow));
       // 初回だけ全体が見えるように寄せる（undo等の再initでは視点を動かさない）
       if (isFirstInit && parsed.nodes.length > 0) {
         setTimeout(() => fitView({ maxZoom: 1, padding: 0.15 }), 50);
@@ -283,10 +309,10 @@ function FlowEditor() {
       setNodes((nds) => sortParentsFirst([...nds, node]));
 
       if (type === 'rds' && !vpc) {
-        showToast('ヒント: RDSはVPCの枠の中に配置してください');
+        showToast(t('toast.rdsNeedsVpc'));
       }
     },
-    [screenToFlowPosition, nodes, setNodes, findVpcAt, showToast],
+    [screenToFlowPosition, nodes, setNodes, findVpcAt, showToast, t],
   );
 
   // ---------- 既存ノードのドラッグでVPCに出し入れ ----------
@@ -342,11 +368,13 @@ function FlowEditor() {
       const src = nodes.find((n) => n.id === conn.source);
       const dst = nodes.find((n) => n.id === conn.target);
       if (src && dst) {
-        const desc = CONNECTION_RULES[connectionKey(src.data.serviceType, dst.data.serviceType)];
-        if (desc) showToast(`✓ ${desc}`);
+        // 接続の意味そのものは core の文字列（現状は日本語）をそのまま見せる
+        const description =
+          CONNECTION_RULES[connectionKey(src.data.serviceType, dst.data.serviceType)];
+        if (description) showToast(t('toast.connected', { description }));
       }
     },
-    [setEdges, nodes, showToast],
+    [setEdges, nodes, showToast, t],
   );
 
   const onConnectEnd: OnConnectEnd = useCallback(
@@ -356,16 +384,16 @@ function FlowEditor() {
       const to = state.toNode;
       if (!from || !to || from.id === to.id) return;
       const s = (from.data as AwsNodeData).serviceType;
-      const t = (to.data as AwsNodeData).serviceType;
-      if (s === 'vpc' || t === 'vpc') {
-        showToast('VPCは線でつなぐのではなく、リソースを枠の中にドラッグして配置します');
-      } else if (CONNECTION_RULES[connectionKey(t, s)]) {
-        showToast('矢印の向きが逆です。呼び出す側 → 呼び出される側 の順でつないでください');
+      const target = (to.data as AwsNodeData).serviceType;
+      if (s === 'vpc' || target === 'vpc') {
+        showToast(t('toast.vpcNotConnectable'));
+      } else if (CONNECTION_RULES[connectionKey(target, s)]) {
+        showToast(t('toast.reversedArrow'));
       } else {
-        showToast('この組み合わせの接続は現在サポートされていません');
+        showToast(t('toast.unsupportedConnection'));
       }
     },
-    [showToast],
+    [showToast, t],
   );
 
   // ---------- 選択・編集 ----------
@@ -428,20 +456,22 @@ function FlowEditor() {
       setNodes(sortParentsFirst(template.nodes.map((n) => structuredClone(n))));
       setEdges(template.edges.map((e) => ({ ...defaultEdgeOptions, ...e })));
       setShowGallery(false);
-      showToast(`テンプレート「${template.title}」を読み込みました`);
+      showToast(
+        t('toast.templateLoaded', { title: templateTitle(lang, template.id, template.title) }),
+      );
       setTimeout(() => fitView({ maxZoom: 1, padding: 0.15 }), 50);
     },
-    [setNodes, setEdges, showToast, fitView],
+    [setNodes, setEdges, showToast, fitView, lang, t],
   );
 
   const clearAll = useCallback(() => {
     if (nodes.length === 0) return;
-    if (globalThis.confirm('キャンバスをすべて消去しますか？')) {
+    if (globalThis.confirm(t('header.clearAllConfirm'))) {
       setNodes([]);
       setEdges([]);
       setSelectedId(null);
     }
-  }, [nodes.length, setNodes, setEdges]);
+  }, [nodes.length, setNodes, setEdges, t]);
 
   /** 図をアーキテクチャ定義ファイル（*.awsarch.yaml）として書き出す */
   const saveDiagram = useCallback(() => {
@@ -464,22 +494,24 @@ function FlowEditor() {
       reader.onload = () => {
         const text = String(reader.result);
         try {
-          const parsed = parseDiagramText(text, detectLanguage(file.name, text));
+          const parsed = parseDiagramText(text, detectLanguage(file.name, text), lang);
           setNodes(sortParentsFirst(parsed.nodes));
           setEdges(parsed.edges.map((edge) => ({ ...defaultEdgeOptions, ...edge })));
           setNaming({ ...DEFAULT_NAMING, ...parsed.naming });
           showToast(
-            parsed.warnings.length > 0 ? warningSummary(parsed.warnings) : '図を読み込みました',
+            parsed.warnings.length > 0
+              ? warningSummary(parsed.warnings, t)
+              : t('toast.diagramLoaded'),
           );
           setTimeout(() => fitView({ maxZoom: 1, padding: 0.15 }), 50);
         } catch (error) {
-          showToast(`読み込みに失敗しました: ${documentErrorMessage(error)}`);
+          showToast(t('toast.loadFailed', { message: documentErrorMessage(error, t) }));
         }
       };
       reader.readAsText(file);
       event.target.value = '';
     },
-    [setNodes, setEdges, showToast, fitView],
+    [setNodes, setEdges, showToast, fitView, lang, t],
   );
 
   return (
@@ -489,33 +521,42 @@ function FlowEditor() {
           <span className="header__mark">▦</span>
           <h1>
             Zuform
-            <span className="header__sub">図を描くと Terraform ができる</span>
+            <span className="header__sub">{t('header.subtitle')}</span>
           </h1>
         </div>
         <div className="header__actions">
+          <button
+            type="button"
+            className="btn btn--ghost-light"
+            onClick={() => setLang(lang === 'ja' ? 'en' : 'ja')}
+            title={t('lang.toggleTitle')}
+            lang={lang === 'ja' ? 'en' : 'ja'}
+          >
+            {t('lang.toggleLabel')}
+          </button>
           <button type="button" className="btn btn--ghost-light" onClick={() => setShowGallery(true)}>
-            テンプレート
+            {t('header.templates')}
           </button>
           <button type="button" className="btn btn--ghost-light" onClick={() => setShowSettings(true)}>
-            設定
+            {t('header.settings')}
           </button>
           {/* VSCode内ではファイルの保存/オープンはエディタ側（Ctrl+S・エクスプローラ）に一本化する */}
           {!IN_VSCODE && (
             <>
               <button type="button" className="btn btn--ghost-light" onClick={saveDiagram}>
-                図を保存
+                {t('header.saveDiagram')}
               </button>
               <button
                 type="button"
                 className="btn btn--ghost-light"
                 onClick={() => fileInputRef.current?.click()}
               >
-                図を開く
+                {t('header.openDiagram')}
               </button>
             </>
           )}
           <button type="button" className="btn btn--ghost-light btn--danger-text" onClick={clearAll}>
-            全消去
+            {t('header.clearAll')}
           </button>
           <input
             ref={fileInputRef}
@@ -534,18 +575,17 @@ function FlowEditor() {
           {docError && (
             <div className="doc-error" role="alert">
               <div className="doc-error__body">
-                <p className="doc-error__title">ファイルの内容を読み取れませんでした</p>
+                <p className="doc-error__title">{t('docError.title')}</p>
+                {/* エラー本文は core（ArchParseError）が組み立てた文字列をそのまま出す */}
                 <p className="doc-error__message">{docError}</p>
-                <p className="doc-error__hint">
-                  キャンバスは最後に読み取れた状態のままです。ファイルを直すまで、ここでの編集はファイルへ反映されません。
-                </p>
+                <p className="doc-error__hint">{t('docError.hint')}</p>
               </div>
               <button
                 type="button"
                 className="doc-error__close"
                 onClick={() => setDocError(null)}
-                aria-label="閉じる"
-                title="閉じる（ファイルが直るまで同期は止まったままです）"
+                aria-label={t('common.close')}
+                title={t('docError.closeTitle')}
               >
                 ×
               </button>
@@ -585,13 +625,13 @@ function FlowEditor() {
 
           {nodes.length === 0 && (
             <div className="canvas__empty">
-              <p className="canvas__empty-title">まだ何も置かれていません</p>
+              <p className="canvas__empty-title">{t('canvas.emptyTitle')}</p>
               <p>
-                左のパレットからアイコンをドラッグするか、
+                {t('canvas.emptyLead')}
                 <button type="button" className="link-button" onClick={() => setShowGallery(true)}>
-                  テンプレートから始める
+                  {t('canvas.emptyLink')}
                 </button>
-                を選びましょう
+                {t('canvas.emptyTail')}
               </p>
             </div>
           )}
@@ -623,9 +663,35 @@ function FlowEditor() {
 }
 
 export default function App() {
+  const [lang, setLangState] = useState<Lang>(detectInitialLang);
+
+  /** 言語を切り替えて localStorage に残す（次回起動時もこの言語で開く） */
+  const setLang = useCallback((next: Lang) => {
+    setLangState(next);
+    persistLang(next);
+  }, []);
+
+  // lang が変わるたびに新しい t を作り、配下のUIをまとめて再描画させる
+  const value = useMemo<LangContextValue>(
+    () => ({
+      lang,
+      setLang,
+      t: (key, vars) => translate(lang, key, vars),
+    }),
+    [lang, setLang],
+  );
+
+  // タイトルと html の lang 属性も表示言語に追従させる
+  useEffect(() => {
+    document.title = translate(lang, 'app.title');
+    document.documentElement.lang = lang;
+  }, [lang]);
+
   return (
-    <ReactFlowProvider>
-      <FlowEditor />
-    </ReactFlowProvider>
+    <LangContext.Provider value={value}>
+      <ReactFlowProvider>
+        <FlowEditor />
+      </ReactFlowProvider>
+    </LangContext.Provider>
   );
 }

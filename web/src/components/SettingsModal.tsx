@@ -1,5 +1,6 @@
 import type { NamingConfig } from '@zuform/core/types';
 import { applyNamingPattern, toKebabName } from '@zuform/core/generator';
+import { useLang } from '../i18n.ts';
 
 interface Props {
   naming: NamingConfig;
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function SettingsModal({ naming, onChange, onClose }: Props) {
+  const { t } = useLang();
   const preview = applyNamingPattern(naming.pattern, {
     project: toKebabName(naming.project) || 'myapp',
     env: 'dev',
@@ -19,35 +21,39 @@ export function SettingsModal({ naming, onChange, onClose }: Props) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal__head">
-          <h2>設定</h2>
-          <button type="button" className="modal__close" onClick={onClose}>
+          <h2>{t('settings.title')}</h2>
+          <button
+            type="button"
+            className="modal__close"
+            onClick={onClose}
+            aria-label={t('common.close')}
+          >
             ×
           </button>
         </div>
 
         <label className="inspector__field">
-          <span>プロジェクト名（{'{project}'} に入ります）</span>
+          <span>{t('settings.projectLabel')}</span>
           <input
             value={naming.project}
             onChange={(e) => onChange({ ...naming, project: e.target.value })}
-            placeholder="例: myapp"
+            placeholder={t('settings.projectPlaceholder')}
           />
         </label>
 
         <label className="inspector__field">
-          <span>命名規則パターン（使えるトークン: {'{project} {env} {name}'}）</span>
+          <span>{t('settings.patternLabel')}</span>
           <input
             value={naming.pattern}
             onChange={(e) => onChange({ ...naming, pattern: e.target.value })}
             placeholder="{project}-{env}-{name}"
           />
         </label>
-        {!patternValid && (
-          <p className="modal__error">パターンには {'{name}'} を含めてください</p>
-        )}
+        {!patternValid && <p className="modal__error">{t('settings.patternError')}</p>}
         <p className="modal__preview">
-          プレビュー: <code>{preview}</code>
-          <span className="modal__preview-note">（DEV環境・名前 user-api の場合）</span>
+          {t('settings.previewLabel')}
+          <code>{preview}</code>
+          <span className="modal__preview-note">{t('settings.previewNote')}</span>
         </p>
 
         <label className="modal__check">
@@ -56,13 +62,10 @@ export function SettingsModal({ naming, onChange, onClose }: Props) {
             checked={naming.commonTags}
             onChange={(e) => onChange({ ...naming, commonTags: e.target.checked })}
           />
-          全リソースに共通タグを付与（Project / Environment / ManagedBy）
+          {t('settings.commonTags')}
         </label>
 
-        <p className="modal__note">
-          設定は生成されるTerraformコードの物理リソース名とタグに反映されます。
-          図と一緒にJSONへ保存されます。
-        </p>
+        <p className="modal__note">{t('settings.note')}</p>
       </div>
     </div>
   );

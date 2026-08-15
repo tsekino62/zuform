@@ -2,6 +2,7 @@ import type { AwsNode, EnvId } from '@zuform/core/types';
 import { ENV_IDS } from '@zuform/core/types';
 import { MODULES } from '@zuform/core/registry';
 import { ICONS } from '../icons.ts';
+import { useLang } from '../i18n.ts';
 
 interface Props {
   node: AwsNode;
@@ -18,6 +19,7 @@ export function InspectorPanel({
   onChangeExtraHcl,
   onDelete,
 }: Props) {
+  const { t } = useLang();
   const def = MODULES[node.data.serviceType];
   const current: EnvId[] = node.data.envs ?? [...ENV_IDS];
 
@@ -36,15 +38,15 @@ export function InspectorPanel({
         <span>{def.displayName}</span>
       </div>
       <label className="inspector__field">
-        <span>名前（リソース名に使われます）</span>
+        <span>{t('inspector.nameLabel')}</span>
         <input
           value={node.data.label}
           onChange={(e) => onRename(node.id, e.target.value)}
-          placeholder="例: user-api"
+          placeholder={t('inspector.namePlaceholder')}
         />
       </label>
       <div className="inspector__field">
-        <span>作成する環境</span>
+        <span>{t('inspector.envsLabel')}</span>
         <div className="inspector__envs">
           {ENV_IDS.map((env) => (
             <label key={env} className={`env-toggle${current.includes(env) ? ' is-on' : ''}`}>
@@ -59,7 +61,7 @@ export function InspectorPanel({
         </div>
       </div>
       <label className="inspector__field">
-        <span>追加HCL（上級者向け）</span>
+        <span>{t('inspector.extraHclLabel')}</span>
         <textarea
           className="inspector__hcl"
           value={node.data.extraHcl ?? ''}
@@ -68,10 +70,10 @@ export function InspectorPanel({
           }
           placeholder="memory_size = 512"
         />
-        <small>このリソースのブロック末尾にそのまま挿入されます</small>
+        <small>{t('inspector.extraHclNote')}</small>
       </label>
       <button type="button" className="btn btn--danger" onClick={() => onDelete(node.id)}>
-        削除（Deleteキーでも可）
+        {t('inspector.delete')}
       </button>
     </div>
   );

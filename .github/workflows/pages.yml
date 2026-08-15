@@ -1,0 +1,53 @@
+name: Pages
+
+# web/dist/（Viteの本番ビルド）をそのまま GitHub Pages へ公開する。
+# vite.config.ts の base が './'（相対パス）なので、プロジェクトページの
+# サブパス配信（/zuform/）でも追加設定は不要。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同時デプロイを避ける（進行中のデプロイは完走させる）
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 静的サイトのビルド
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      # enablement: true にすると、リポジトリのPages設定が未設定でも自動で有効化される
+      - name: Pagesの設定
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: 本番ビルド
+        run: deno task build
+      - name: 成果物のアップロード
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    name: Pagesへデプロイ
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: デプロイ
+        id: deployment
+        uses: actions/deploy-pages@v4

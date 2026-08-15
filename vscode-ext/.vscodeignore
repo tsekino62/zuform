@@ -1,0 +1,11 @@
+.vscode/**
+.gitignore
+.vscodeignore
+src/**
+tsconfig.json
+build.mjs
+copy-media.mjs
+node_modules/**
+**/*.map
+**/*.ts
+!dist/extension.js

@@ -1,0 +1,580 @@
+import dagre from '@dagrejs/dagre';
+import { parse as parseYaml, YAMLParseError } from 'yaml';
+import type { Edge } from '@xyflow/react';
+import type { AwsNode, AwsNodeData, EnvId, NamingConfig, ServiceType } from './types.ts';
+import { DEFAULT_NAMING, ENV_IDS } from './types.ts';
+import { CONNECTION_RULES, connectionKey } from './registry/index.ts';
+
+/** サポートするサービス種別（types.ts の ServiceType と同期させること） */
+const VALID_SERVICE_TYPES: ReadonlySet<string> = new Set<ServiceType>([
+  'apigateway',
+  'lambda',
+  'ec2',
+  'rds',
+  'dynamodb',
+  's3',
+  'sqs',
+  'sns',
+  'eventbridge',
+  'stepfunctions',
+  'cloudfront',
+  'vpc',
+]);
+
+const KNOWN_TOP_LEVEL_KEYS = new Set([
+  'version',
+  'project',
+  'naming',
+  'resources',
+  'connections',
+  'layout',
+]);
+
+const KNOWN_RESOURCE_KEYS = new Set(['type', 'in', 'envs', 'extra_hcl']);
+
+/** ダミーノードサイズ（自動レイアウトの計算・vpcバウンディングボックス算出に使用） */
+const AUTO_NODE_WIDTH = 100;
+const AUTO_NODE_HEIGHT = 90;
+const DEFAULT_VPC_WIDTH = 560;
+const DEFAULT_VPC_HEIGHT = 340;
+
+export interface ArchParseResult {
+  /** position確定済み（layout指定 or 自動レイアウト） */
+  nodes: AwsNode[];
+  edges: Edge[];
+  naming: NamingConfig;
+  /** 軽微な問題（未知のキー等）。日本語 */
+  warnings: string[];
+}
+
+/** archfile(YAML)のパース・変換に関する致命的なエラー */
+export class ArchParseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ArchParseError';
+  }
+}
+
+interface ParsedResource {
+  label: string;
+  type: ServiceType;
+  in?: string;
+  envs?: EnvId[];
+  extraHcl?: string;
+}
+
+interface ParsedConnection {
+  from: string;
+  to: string;
+}
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface VpcBox extends Point {
+  width: number;
+  height: number;
+}
+
+/** YAMLテキスト → 内部モデル。致命的な問題は ArchParseError を投げる */
+export function parseArchYaml(text: string): ArchParseResult {
+  if (text.trim() === '') {
+    return { nodes: [], edges: [], naming: DEFAULT_NAMING, warnings: [] };
+  }
+
+  const warnings: string[] = [];
+
+  let doc: unknown;
+  try {
+    doc = parseYaml(text);
+  } catch (error) {
+    const message = error instanceof YAMLParseError || error instanceof Error
+      ? error.message
+      : String(error);
+    throw new ArchParseError(`archfileのYAML構文が不正です: ${message}`);
+  }
+
+  if (doc === null || doc === undefined) {
+    return { nodes: [], edges: [], naming: DEFAULT_NAMING, warnings: [] };
+  }
+  if (typeof doc !== 'object' || Array.isArray(doc)) {
+    throw new ArchParseError('archfileのトップレベルはマップ形式で記述してください');
+  }
+  const root = doc as Record<string, unknown>;
+
+  for (const key of Object.keys(root)) {
+    if (!KNOWN_TOP_LEVEL_KEYS.has(key)) {
+      warnings.push(`未知のトップレベルキー「${key}」は無視されました`);
+    }
+  }
+
+  const naming = parseNaming(root, warnings);
+  const parsedResources = parseResources(root, warnings);
+  const byLabel = new Map(parsedResources.map((r) => [r.label, r]));
+  validateInReferences(parsedResources, byLabel);
+  const parsedConnections = parseConnections(root, byLabel);
+  warnUnknownConnections(parsedConnections, byLabel, warnings);
+  const layoutMap = parseLayout(root, byLabel, warnings);
+
+  const nodes = buildNodes(parsedResources, parsedConnections, layoutMap);
+  const edges: Edge[] = parsedConnections.map((c) => ({
+    id: `e-${c.from}-${c.to}`,
+    source: c.from,
+    target: c.to,
+  }));
+
+  return { nodes, edges, naming, warnings };
+}
+
+function parseNaming(root: Record<string, unknown>, warnings: string[]): NamingConfig {
+  const project = typeof root.project === 'string' && root.project.trim() !== ''
+    ? root.project
+    : DEFAULT_NAMING.project;
+
+  let pattern = DEFAULT_NAMING.pattern;
+  let commonTags = DEFAULT_NAMING.commonTags;
+
+  const namingRaw = root.naming;
+  if (namingRaw !== undefined && namingRaw !== null) {
+    if (typeof namingRaw !== 'object' || Array.isArray(namingRaw)) {
+      throw new ArchParseError('naming はマップ形式で記述してください');
+    }
+    const namingObj = namingRaw as Record<string, unknown>;
+    if (namingObj.pattern !== undefined) {
+      if (typeof namingObj.pattern !== 'string') {
+        throw new ArchParseError('naming.pattern は文字列で指定してください');
+      }
+      pattern = namingObj.pattern;
+    }
+    if (namingObj.commonTags !== undefined) {
+      if (typeof namingObj.commonTags !== 'boolean') {
+        throw new ArchParseError('naming.commonTags は真偽値で指定してください');
+      }
+      commonTags = namingObj.commonTags;
+    }
+    for (const key of Object.keys(namingObj)) {
+      if (key !== 'pattern' && key !== 'commonTags') {
+        warnings.push(`naming内の未知のキー「${key}」は無視されました`);
+      }
+    }
+  }
+
+  return { project, pattern, commonTags };
+}
+
+function parseResources(
+  root: Record<string, unknown>,
+  warnings: string[],
+): ParsedResource[] {
+  const resourcesRaw = root.resources;
+  if (resourcesRaw === undefined || resourcesRaw === null) return [];
+  if (typeof resourcesRaw !== 'object' || Array.isArray(resourcesRaw)) {
+    throw new ArchParseError('resources はマップ形式で記述してください');
+  }
+
+  const result: ParsedResource[] = [];
+  for (const [label, valueRaw] of Object.entries(resourcesRaw as Record<string, unknown>)) {
+    if (typeof valueRaw !== 'object' || valueRaw === null || Array.isArray(valueRaw)) {
+      throw new ArchParseError(`リソース「${label}」の定義はマップ形式で記述してください`);
+    }
+    const value = valueRaw as Record<string, unknown>;
+
+    const typeStr = value.type;
+    if (typeof typeStr !== 'string' || typeStr.trim() === '') {
+      throw new ArchParseError(`リソース「${label}」に type が指定されていません`);
+    }
+    if (!VALID_SERVICE_TYPES.has(typeStr)) {
+      throw new ArchParseError(
+        `リソース「${label}」の type「${typeStr}」は未知のサービス種別です`,
+      );
+    }
+
+    let inRef: string | undefined;
+    if (value.in !== undefined) {
+      if (typeof value.in !== 'string' || value.in.trim() === '') {
+        throw new ArchParseError(`リソース「${label}」の in は文字列で指定してください`);
+      }
+      inRef = value.in;
+    }
+
+    let envs: EnvId[] | undefined;
+    if (value.envs !== undefined) {
+      const isValidEnvArray = Array.isArray(value.envs) &&
+        value.envs.every((e) => typeof e === 'string' && ENV_IDS.includes(e as EnvId));
+      if (!isValidEnvArray) {
+        throw new ArchParseError(
+          `リソース「${label}」の envs は dev/stg/prd のみを含む配列で指定してください`,
+        );
+      }
+      envs = value.envs as EnvId[];
+    }
+
+    let extraHcl: string | undefined;
+    if (value.extra_hcl !== undefined) {
+      if (typeof value.extra_hcl !== 'string') {
+        throw new ArchParseError(`リソース「${label}」の extra_hcl は文字列で指定してください`);
+      }
+      extraHcl = value.extra_hcl;
+    }
+
+    for (const key of Object.keys(value)) {
+      if (!KNOWN_RESOURCE_KEYS.has(key)) {
+        warnings.push(`リソース「${label}」内の未知のキー「${key}」は無視されました`);
+      }
+    }
+
+    result.push({ label, type: typeStr as ServiceType, in: inRef, envs, extraHcl });
+  }
+  return result;
+}
+
+function validateInReferences(
+  resources: ParsedResource[],
+  byLabel: Map<string, ParsedResource>,
+): void {
+  for (const r of resources) {
+    if (r.in === undefined) continue;
+    if (r.type === 'vpc') {
+      throw new ArchParseError(
+        `リソース「${r.label}」: VPCを別のVPCの中に配置することはできません`,
+      );
+    }
+    const target = byLabel.get(r.in);
+    if (!target) {
+      throw new ArchParseError(
+        `リソース「${r.label}」の in が参照するリソース「${r.in}」が存在しません`,
+      );
+    }
+    if (target.type !== 'vpc') {
+      throw new ArchParseError(
+        `リソース「${r.label}」の in はvpcタイプのリソースを指定してください（「${r.in}」は${target.type}です）`,
+      );
+    }
+  }
+}
+
+function parseConnections(
+  root: Record<string, unknown>,
+  byLabel: Map<string, ParsedResource>,
+): ParsedConnection[] {
+  const connectionsRaw = root.connections;
+  if (connectionsRaw === undefined || connectionsRaw === null) return [];
+  if (!Array.isArray(connectionsRaw)) {
+    throw new ArchParseError('connections は配列で指定してください');
+  }
+
+  const result: ParsedConnection[] = [];
+  for (const entry of connectionsRaw) {
+    if (typeof entry !== 'string') {
+      throw new ArchParseError(
+        `connectionsの要素「${String(entry)}」は "from -> to" 形式の文字列で指定してください`,
+      );
+    }
+    const match = entry.match(/^\s*(\S+)\s*->\s*(\S+)\s*$/);
+    if (!match) {
+      throw new ArchParseError(
+        `connectionsの要素「${entry}」は "from -> to" 形式で指定してください`,
+      );
+    }
+    const [, from, to] = match;
+    if (!byLabel.has(from)) {
+      throw new ArchParseError(`接続「${entry}」の接続元「${from}」は存在しないリソースです`);
+    }
+    if (!byLabel.has(to)) {
+      throw new ArchParseError(`接続「${entry}」の接続先「${to}」は存在しないリソースです`);
+    }
+    result.push({ from, to });
+  }
+  return result;
+}
+
+function warnUnknownConnections(
+  connections: ParsedConnection[],
+  byLabel: Map<string, ParsedResource>,
+  warnings: string[],
+): void {
+  for (const c of connections) {
+    const fromType = byLabel.get(c.from)!.type;
+    const toType = byLabel.get(c.to)!.type;
+    const key = connectionKey(fromType, toType);
+    if (!(key in CONNECTION_RULES)) {
+      warnings.push(
+        `接続「${c.from} -> ${c.to}」（${fromType} -> ${toType}）は既知の接続ルールに存在しないため、この接続はコード生成されません`,
+      );
+    }
+  }
+}
+
+function parseLayout(
+  root: Record<string, unknown>,
+  byLabel: Map<string, ParsedResource>,
+  warnings: string[],
+): Map<string, number[]> {
+  const layoutRaw = root.layout;
+  const result = new Map<string, number[]>();
+  if (layoutRaw === undefined || layoutRaw === null) return result;
+  if (typeof layoutRaw !== 'object' || Array.isArray(layoutRaw)) {
+    throw new ArchParseError('layout はマップ形式で指定してください');
+  }
+  for (const [label, coordsRaw] of Object.entries(layoutRaw as Record<string, unknown>)) {
+    if (!byLabel.has(label)) {
+      warnings.push(`layoutに存在しないリソース「${label}」への座標指定は無視されました`);
+      continue;
+    }
+    if (!Array.isArray(coordsRaw) || !coordsRaw.every((n) => typeof n === 'number')) {
+      throw new ArchParseError(`layoutの「${label}」は数値の配列で指定してください`);
+    }
+    result.set(label, coordsRaw as number[]);
+  }
+  return result;
+}
+
+/** vpc以外の全ノード＋全接続でdagre(LR)を実行し、絶対座標(中心→左上変換済み)を返す */
+function autoLayoutNonVpc(
+  labels: string[],
+  connections: ParsedConnection[],
+): Map<string, Point> {
+  const graph = new dagre.graphlib.Graph();
+  graph.setGraph({ rankdir: 'LR', nodesep: 60, ranksep: 120 });
+  graph.setDefaultEdgeLabel(() => ({}));
+  const labelSet = new Set(labels);
+  for (const label of labels) {
+    graph.setNode(label, { width: AUTO_NODE_WIDTH, height: AUTO_NODE_HEIGHT });
+  }
+  for (const c of connections) {
+    if (labelSet.has(c.from) && labelSet.has(c.to)) {
+      graph.setEdge(c.from, c.to);
+    }
+  }
+  dagre.layout(graph);
+
+  const result = new Map<string, Point>();
+  for (const label of labels) {
+    const n = graph.node(label);
+    result.set(label, { x: n.x - n.width / 2, y: n.y - n.height / 2 });
+  }
+  return result;
+}
+
+function buildNodes(
+  resources: ParsedResource[],
+  connections: ParsedConnection[],
+  layoutMap: Map<string, number[]>,
+): AwsNode[] {
+  const nonVpc = resources.filter((r) => r.type !== 'vpc');
+  const dagrePositions = autoLayoutNonVpc(
+    nonVpc.map((r) => r.label),
+    connections,
+  );
+
+  // 非vpcノードの絶対座標（layout指定があれば優先して上書き）
+  const absolute = new Map<string, Point>();
+  for (const r of nonVpc) {
+    const override = layoutMap.get(r.label);
+    if (override && override.length >= 2) {
+      absolute.set(r.label, { x: Math.round(override[0]), y: Math.round(override[1]) });
+    } else {
+      const p = dagrePositions.get(r.label)!;
+      absolute.set(r.label, { x: Math.round(p.x), y: Math.round(p.y) });
+    }
+  }
+
+  // vpcの位置・サイズ
+  const vpcBoxes = new Map<string, VpcBox>();
+  for (const r of resources) {
+    if (r.type !== 'vpc') continue;
+    const override = layoutMap.get(r.label);
+    if (override && override.length >= 4) {
+      vpcBoxes.set(r.label, {
+        x: Math.round(override[0]),
+        y: Math.round(override[1]),
+        width: Math.round(override[2]),
+        height: Math.round(override[3]),
+      });
+      continue;
+    }
+    if (override && override.length >= 2) {
+      vpcBoxes.set(r.label, {
+        x: Math.round(override[0]),
+        y: Math.round(override[1]),
+        width: DEFAULT_VPC_WIDTH,
+        height: DEFAULT_VPC_HEIGHT,
+      });
+      continue;
+    }
+    const children = nonVpc.filter((c) => c.in === r.label);
+    if (children.length === 0) {
+      vpcBoxes.set(r.label, { x: 0, y: 0, width: DEFAULT_VPC_WIDTH, height: DEFAULT_VPC_HEIGHT });
+      continue;
+    }
+    const xs = children.map((c) => absolute.get(c.label)!.x);
+    const ys = children.map((c) => absolute.get(c.label)!.y);
+    const minX = Math.min(...xs) - 60;
+    const minY = Math.min(...ys) - 80;
+    const maxX = Math.max(...children.map((c) => absolute.get(c.label)!.x + AUTO_NODE_WIDTH)) + 60;
+    const maxY = Math.max(...children.map((c) => absolute.get(c.label)!.y + AUTO_NODE_HEIGHT)) + 60;
+    vpcBoxes.set(r.label, {
+      x: Math.round(minX),
+      y: Math.round(minY),
+      width: Math.round(maxX - minX),
+      height: Math.round(maxY - minY),
+    });
+  }
+
+  const nodes: AwsNode[] = [];
+
+  // vpcノードを配列の先頭に（React Flowの親子要件）
+  for (const r of resources) {
+    if (r.type !== 'vpc') continue;
+    const box = vpcBoxes.get(r.label)!;
+    nodes.push({
+      id: r.label,
+      type: 'vpc',
+      position: { x: box.x, y: box.y },
+      style: { width: box.width, height: box.height },
+      data: buildNodeData(r),
+    });
+  }
+  for (const r of resources) {
+    if (r.type === 'vpc') continue;
+    const abs = absolute.get(r.label)!;
+    if (r.in) {
+      const box = vpcBoxes.get(r.in)!;
+      nodes.push({
+        id: r.label,
+        type: 'aws',
+        parentId: r.in,
+        position: { x: abs.x - box.x, y: abs.y - box.y },
+        data: buildNodeData(r),
+      });
+    } else {
+      nodes.push({
+        id: r.label,
+        type: 'aws',
+        position: { x: abs.x, y: abs.y },
+        data: buildNodeData(r),
+      });
+    }
+  }
+
+  return nodes;
+}
+
+function buildNodeData(r: ParsedResource): AwsNodeData {
+  return {
+    serviceType: r.type,
+    label: r.label,
+    ...(r.envs ? { envs: r.envs } : {}),
+    ...(r.extraHcl !== undefined && r.extraHcl.trim() !== '' ? { extraHcl: r.extraHcl } : {}),
+  };
+}
+
+/** YAMLの識別子として安全な文字列か（プレーンスカラーとして引用符なしで出力できるか） */
+function isSafePlainScalar(value: string): boolean {
+  return /^[A-Za-z][A-Za-z0-9_.-]*$/.test(value);
+}
+
+function yamlScalar(value: string): string {
+  return isSafePlainScalar(value) ? value : JSON.stringify(value);
+}
+
+/** ノードの親を辿って絶対座標を求める（vpcはparentIdを持たない前提） */
+function absolutePosition(node: AwsNode, byId: Map<string, AwsNode>): Point {
+  if (!node.parentId) return { x: node.position.x, y: node.position.y };
+  const parent = byId.get(node.parentId);
+  if (!parent) return { x: node.position.x, y: node.position.y };
+  const parentAbs = absolutePosition(parent, byId);
+  return { x: parentAbs.x + node.position.x, y: parentAbs.y + node.position.y };
+}
+
+/** 内部モデル → YAMLテキスト（安定した順序で出力。差分が意味を持つように） */
+export function serializeArchYaml(
+  nodes: AwsNode[],
+  edges: Edge[],
+  naming: NamingConfig,
+): string {
+  // vpcノードを先頭に（元の相対順序は維持）
+  const ordered = [...nodes].sort((a, b) => {
+    const av = a.data.serviceType === 'vpc' ? 0 : 1;
+    const bv = b.data.serviceType === 'vpc' ? 0 : 1;
+    return av - bv;
+  });
+
+  // labelの重複を -2 -3 ... で一意化
+  const usedLabels = new Set<string>();
+  const idToLabel = new Map<string, string>();
+  for (const n of ordered) {
+    const baseLabel = n.data.label;
+    let candidate = baseLabel;
+    let i = 2;
+    while (usedLabels.has(candidate)) {
+      candidate = `${baseLabel}-${i++}`;
+    }
+    usedLabels.add(candidate);
+    idToLabel.set(n.id, candidate);
+  }
+
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+
+  const lines: string[] = [];
+  lines.push('version: 1');
+  lines.push(`project: ${yamlScalar(naming.project)}`);
+  lines.push('naming:');
+  lines.push(`  pattern: ${yamlScalar(naming.pattern)}`);
+  lines.push(`  commonTags: ${naming.commonTags}`);
+  lines.push('');
+
+  lines.push('resources:');
+  for (const n of ordered) {
+    const label = idToLabel.get(n.id)!;
+    lines.push(`  ${yamlScalar(label)}:`);
+    lines.push(`    type: ${n.data.serviceType}`);
+    if (n.parentId) {
+      const parentLabel = idToLabel.get(n.parentId);
+      if (parentLabel) lines.push(`    in: ${yamlScalar(parentLabel)}`);
+    }
+    if (n.data.envs && n.data.envs.length > 0) {
+      lines.push(`    envs: [${n.data.envs.join(', ')}]`);
+    }
+    if (n.data.extraHcl && n.data.extraHcl.trim() !== '') {
+      lines.push('    extra_hcl: |');
+      for (const rawLine of n.data.extraHcl.split('\n')) {
+        lines.push(rawLine === '' ? '' : `      ${rawLine}`);
+      }
+    }
+  }
+  lines.push('');
+
+  lines.push('connections:');
+  for (const e of edges) {
+    const fromLabel = idToLabel.get(e.source) ?? e.source;
+    const toLabel = idToLabel.get(e.target) ?? e.target;
+    const bothSafe = isSafePlainScalar(fromLabel) && isSafePlainScalar(toLabel);
+    const connStr = `${fromLabel} -> ${toLabel}`;
+    lines.push(`  - ${bothSafe ? connStr : JSON.stringify(connStr)}`);
+  }
+  lines.push('');
+
+  lines.push('layout:');
+  for (const n of ordered) {
+    const label = idToLabel.get(n.id)!;
+    const abs = absolutePosition(n, byId);
+    const x = Math.round(abs.x);
+    const y = Math.round(abs.y);
+    if (n.data.serviceType === 'vpc') {
+      const width = Math.round(
+        typeof n.style?.width === 'number' ? n.style.width : DEFAULT_VPC_WIDTH,
+      );
+      const height = Math.round(
+        typeof n.style?.height === 'number' ? n.style.height : DEFAULT_VPC_HEIGHT,
+      );
+      lines.push(`  ${yamlScalar(label)}: [${x}, ${y}, ${width}, ${height}]`);
+    } else {
+      lines.push(`  ${yamlScalar(label)}: [${x}, ${y}]`);
+    }
+  }
+
+  return lines.join('\n') + '\n';
+}

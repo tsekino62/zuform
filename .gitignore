@@ -1,0 +1,10 @@
+# Denoが自動管理する依存ディレクトリ（deno.json から再生成される）
+node_modules/
+dist/
+fixtures/
+.DS_Store
+
+# ローカルの構成図（テスト用）はコミットしない
+/*.awsarch.yaml
+/*.awsdiagram.json
+/*.awsdiagram.json.awsdiagram.json

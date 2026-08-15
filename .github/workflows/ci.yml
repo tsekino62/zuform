@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: 型チェック・テスト・ビルド
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: 型チェック
+        run: deno task check
+      - name: テスト（スナップショット含む）
+        run: deno task test
+      - name: 本番ビルド
+        run: deno task build
+
+  terraform-validate:
+    name: 生成Terraformの検証
+    runs-on: ubuntu-latest
+    env:
+      TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.tf-cache
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - name: 全テンプレート×全環境のコードを生成
+        run: deno task fixtures
+      - name: terraform validate
+        run: |
+          mkdir -p "$TF_PLUGIN_CACHE_DIR"
+          for dir in fixtures/*/*/; do
+            echo "=== $dir"
+            terraform -chdir="$dir" init -backend=false -input=false > /dev/null
+            terraform -chdir="$dir" validate -no-color
+          done

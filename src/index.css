@@ -1,0 +1,43 @@
+:root {
+  --ink: #232f3e;
+  --ink-deep: #161e2d;
+  --accent: #ff9900;
+  --accent-deep: #e88b00;
+  --vpc: #8c4fff;
+  --paper: #faf8f5;
+  --panel: #ffffff;
+  --line: #e3e0da;
+  --text: #2b3442;
+  --text-dim: #6b7484;
+  --code-bg: #10192a;
+  --code-text: #d7deea;
+  --radius: 10px;
+
+  font-family: 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', 'Segoe UI', system-ui,
+    sans-serif;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--paper);
+}
+
+button {
+  font-family: inherit;
+}

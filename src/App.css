@@ -1,0 +1,1044 @@
+/* ============ レイアウト ============ */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ============ ヘッダー ============ */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 54px;
+  padding: 0 18px;
+  background: linear-gradient(180deg, var(--ink) 0%, var(--ink-deep) 100%);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.header__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header__mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--ink-deep);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.header__sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: #9aa7ba;
+}
+
+.header__actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ============ ボタン ============ */
+.btn {
+  border: none;
+  border-radius: 7px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn--ghost-light {
+  background: rgba(255, 255, 255, 0.08);
+  color: #dfe6ef;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.btn--ghost-light:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.btn--danger-text:hover {
+  background: rgba(255, 90, 90, 0.22);
+  color: #ffc9c9;
+}
+
+.btn--ghost {
+  background: rgba(255, 255, 255, 0.06);
+  color: #c4cede;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.btn--accent {
+  background: var(--accent);
+  color: #1d1300;
+}
+
+.btn--accent:hover {
+  background: #ffad33;
+  box-shadow: 0 2px 10px rgba(255, 153, 0, 0.35);
+}
+
+.btn--danger {
+  background: #fbe9e9;
+  color: #b42323;
+  border: 1px solid #f2c7c7;
+}
+
+.btn--danger:hover {
+  background: #f7d7d7;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent-deep);
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ============ サイドバー（パレット） ============ */
+.sidebar {
+  width: 236px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+  padding: 14px 12px 8px;
+}
+
+.sidebar__intro {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  background: #fff7ea;
+  border: 1px solid #f5e3c2;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 14px;
+}
+
+.sidebar__intro strong {
+  color: var(--accent-deep);
+}
+
+.sidebar__group {
+  margin-bottom: 14px;
+}
+
+.sidebar__category {
+  margin: 0 0 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  background: #fff;
+  cursor: grab;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.palette-item:hover {
+  border-color: var(--accent);
+  box-shadow: 0 3px 10px rgba(35, 47, 62, 0.1);
+  transform: translateY(-1px);
+}
+
+.palette-item:active {
+  cursor: grabbing;
+}
+
+.palette-item--group {
+  border-style: dashed;
+  border-color: #cdb3ff;
+  background: #faf7ff;
+}
+
+.palette-item--group:hover {
+  border-color: var(--vpc);
+}
+
+.palette-item__icon {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+}
+
+.palette-item__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.palette-item__name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.palette-item__desc {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar__footer {
+  font-size: 10px;
+  color: #a8aeb9;
+  text-align: center;
+  padding: 8px 0 4px;
+}
+
+/* ============ キャンバス ============ */
+.canvas {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+  background: var(--paper);
+}
+
+.canvas__empty {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: var(--text-dim);
+  pointer-events: none;
+  font-size: 13px;
+}
+
+.canvas__empty p {
+  margin: 4px 0;
+}
+
+.canvas__empty .link-button {
+  pointer-events: auto;
+}
+
+.canvas__empty-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #9aa0ac;
+}
+
+/* ============ AWSサービスノード ============ */
+.aws-node {
+  width: 100px;
+  padding: 10px 8px 8px;
+  background: #fff;
+  border: 1.5px solid #d8dbe2;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 1px 4px rgba(35, 47, 62, 0.08);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.aws-node:hover {
+  border-color: #b8bec9;
+  box-shadow: 0 4px 12px rgba(35, 47, 62, 0.14);
+}
+
+.aws-node.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 153, 0, 0.25), 0 4px 14px rgba(35, 47, 62, 0.16);
+}
+
+.aws-node__icon {
+  width: 44px;
+  height: 44px;
+  pointer-events: none;
+}
+
+.aws-node__label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: center;
+  word-break: break-all;
+  line-height: 1.3;
+  max-width: 88px;
+}
+
+.aws-handle {
+  width: 10px;
+  height: 10px;
+  border: 2px solid #fff;
+  transition: transform 0.12s, background 0.12s;
+}
+
+.aws-handle--target {
+  background: #8b96a5;
+}
+
+.aws-handle--source {
+  background: var(--accent);
+}
+
+.aws-handle:hover {
+  transform: scale(1.35);
+}
+
+/* ============ VPCグループノード ============ */
+.vpc-node {
+  width: 100%;
+  height: 100%;
+  border: 2px solid var(--vpc);
+  border-radius: 6px;
+  background: rgba(140, 79, 255, 0.045);
+  position: relative;
+}
+
+.vpc-node.is-selected {
+  box-shadow: 0 0 0 3px rgba(140, 79, 255, 0.2);
+}
+
+.vpc-node__tab {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--vpc);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px 3px 4px;
+  border-radius: 0 0 6px 0;
+}
+
+.vpc-node__tab img {
+  width: 20px;
+  height: 20px;
+}
+
+.vpc-node__hint {
+  position: absolute;
+  bottom: 6px;
+  right: 10px;
+  font-size: 10px;
+  color: rgba(140, 79, 255, 0.55);
+  pointer-events: none;
+}
+
+.vpc-resize-line {
+  border-color: var(--vpc) !important;
+}
+
+.vpc-resize-handle {
+  background: var(--vpc) !important;
+  border-radius: 2px !important;
+}
+
+/* React Flow: VPC（グループ）ノードを子ノードより背面に */
+.react-flow__node-vpc {
+  z-index: -1 !important;
+}
+
+/* ============ インスペクタ ============ */
+.inspector {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 232px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(35, 47, 62, 0.14);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 10;
+}
+
+.inspector__type {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.inspector__type img {
+  width: 26px;
+  height: 26px;
+}
+
+.inspector__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inspector__field span {
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+.inspector__field input {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 7px 9px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.inspector__field input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 153, 0, 0.16);
+}
+
+.inspector__field small {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.inspector__hcl {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 7px 9px;
+  font-size: 11px;
+  font-family: ui-monospace, 'SFMono-Regular', 'SF Mono', Menlo, Consolas, monospace;
+  outline: none;
+  min-height: 72px;
+  resize: vertical;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.inspector__hcl:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 153, 0, 0.16);
+}
+
+/* ============ ドキュメント読み取りエラーのバナー ============ */
+/* ファイル（*.awsarch.yaml など）を読み取れなかったときにキャンバス上部へ固定表示する。
+   キャンバス自体は最後に読み取れた状態のまま残るので、操作を邪魔しない高さに抑える。 */
+.doc-error {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  width: min(760px, calc(100% - 32px));
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid #f0c9c9;
+  border-left: 4px solid #b42323;
+  border-radius: var(--radius);
+  padding: 10px 12px 10px 14px;
+  box-shadow: 0 8px 24px rgba(35, 47, 62, 0.14);
+  animation: toast-in 0.15s ease-out;
+}
+
+.doc-error__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.doc-error__title {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #b42323;
+}
+
+.doc-error__message {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.doc-error__hint {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.doc-error__close {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.doc-error__close:hover {
+  background: #f7ecec;
+  color: #b42323;
+}
+
+/* ============ トースト ============ */
+.toast {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  font-size: 12.5px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(22, 30, 45, 0.35);
+  z-index: 20;
+  animation: toast-in 0.2s ease-out;
+  max-width: 70%;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* ============ コードパネル ============ */
+.code-panel {
+  width: 420px;
+  flex-shrink: 0;
+  background: var(--code-bg);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.code-panel__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.code-panel__tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.code-tab {
+  background: none;
+  border: none;
+  color: #7d8aa0;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.code-tab:hover {
+  color: #c4cede;
+}
+
+.code-tab.is-active {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+}
+
+.code-tab__badge {
+  background: var(--accent);
+  color: #1d1300;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0 6px;
+  line-height: 16px;
+}
+
+.code-panel__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.code-panel__code {
+  flex: 1;
+  margin: 0;
+  overflow: auto;
+  padding: 14px 16px 40px;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--code-text);
+  tab-size: 2;
+}
+
+.tok-comment {
+  color: #5d7a5f;
+}
+
+.tok-string {
+  color: #9ecb87;
+}
+
+.tok-keyword {
+  color: #6fb3ff;
+  font-weight: 700;
+}
+
+/* ============ ヒントタブ ============ */
+.code-panel__hints {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  color: #c4cede;
+  font-size: 12.5px;
+}
+
+.hint-empty {
+  color: #8ea08e;
+  background: rgba(120, 200, 120, 0.08);
+  border: 1px solid rgba(120, 200, 120, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.hint-item {
+  display: flex;
+  gap: 8px;
+  background: rgba(255, 190, 80, 0.08);
+  border: 1px solid rgba(255, 190, 80, 0.22);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.hint-item p {
+  margin: 0;
+}
+
+.hint-item__icon {
+  flex-shrink: 0;
+}
+
+.hint-static {
+  margin-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 12px;
+}
+
+.hint-static h3 {
+  font-size: 12px;
+  color: #8fa0b8;
+  margin: 0 0 6px;
+}
+
+.hint-static ol {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.hint-static li {
+  margin-bottom: 4px;
+}
+
+.hint-static code {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 11px;
+}
+
+/* ============ React Flow 微調整 ============ */
+.react-flow__edge-path {
+  stroke-linecap: round;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--accent) !important;
+}
+
+.react-flow__controls {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(35, 47, 62, 0.14);
+}
+
+.react-flow__minimap {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(35, 47, 62, 0.14);
+}
+
+.react-flow__attribution {
+  background: transparent;
+}
+
+/* ============ 環境タブ・環境チップ ============ */
+.code-panel__envs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px 0;
+  flex-shrink: 0;
+}
+
+.env-tab {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #8fa0b8;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 5px 14px;
+  border-radius: 7px 7px 0 0;
+  border-bottom: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.env-tab.is-active {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.env-tab--dev.is-active { box-shadow: inset 0 2px 0 #4cc38a; }
+.env-tab--stg.is-active { box-shadow: inset 0 2px 0 #6fb3ff; }
+.env-tab--prd.is-active { box-shadow: inset 0 2px 0 #ff8a5c; }
+
+.env-tab__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.code-panel__zip {
+  margin-left: auto;
+}
+
+.env-chip {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  line-height: 1.4;
+}
+
+.env-chip--dev { background: #e2f7ec; color: #1c7a4d; }
+.env-chip--stg { background: #e3efff; color: #1d5fae; }
+.env-chip--prd { background: #ffe9df; color: #b5470f; }
+
+.vpc-node__tab .env-chip--dev { background: rgba(255,255,255,0.9); }
+.vpc-node__tab .env-chip--stg { background: rgba(255,255,255,0.9); }
+.vpc-node__tab .env-chip--prd { background: rgba(255,255,255,0.9); }
+
+.aws-node__envs {
+  display: flex;
+  gap: 3px;
+}
+
+/* インスペクタの環境トグル */
+.inspector__envs {
+  display: flex;
+  gap: 6px;
+}
+
+.env-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 5px 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+
+.env-toggle input {
+  display: none;
+}
+
+.env-toggle.is-on {
+  border-color: var(--accent);
+  background: #fff7ea;
+  color: var(--accent-deep);
+}
+
+/* ============ モーダル共通 ============ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(22, 30, 45, 0.5);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+  animation: toast-in 0.15s ease-out;
+}
+
+.modal {
+  width: 440px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  background: var(--panel);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(22, 30, 45, 0.35);
+  padding: 18px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal--wide {
+  width: 760px;
+}
+
+.modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal__head h2 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.modal__close {
+  border: none;
+  background: none;
+  font-size: 20px;
+  color: var(--text-dim);
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.modal__close:hover {
+  background: #f1efe9;
+  color: var(--ink);
+}
+
+.modal__preview {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.modal__preview code {
+  background: #f1efe9;
+  border-radius: 5px;
+  padding: 2px 8px;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.modal__preview-note {
+  margin-left: 6px;
+  font-size: 10.5px;
+}
+
+.modal__error {
+  margin: 0;
+  font-size: 11.5px;
+  color: #b42323;
+}
+
+.modal__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.modal__note {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+/* ============ テンプレートギャラリー ============ */
+.gallery__filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.filter-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+}
+
+.filter-chip.is-active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+.gallery__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.template-card {
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  font-family: inherit;
+}
+
+.template-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 6px 18px rgba(35, 47, 62, 0.12);
+  transform: translateY(-2px);
+}
+
+.template-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.template-card h3 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.template-card p {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+
+.template-card__usecase {
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+.template-card__icons {
+  display: flex;
+  gap: 6px;
+}
+
+.template-card__icons img {
+  width: 30px;
+  height: 30px;
+}
+
+.template-card__cta {
+  margin-top: auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-deep);
+}
+
+.level-badge {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.level-badge--easy {
+  background: #e2f7ec;
+  color: #1c7a4d;
+}
+
+.level-badge--mid {
+  background: #e3efff;
+  color: #1d5fae;
+}

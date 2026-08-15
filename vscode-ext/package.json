@@ -1,0 +1,52 @@
+{
+  "name": "zuform-vscode",
+  "displayName": "Zuform",
+  "description": "AWS構成図を描いてTerraformを生成するカスタムエディタ（プロトタイプ）",
+  "version": "0.0.1",
+  "publisher": "local-dev",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "zuform.diagram",
+        "displayName": "Zuform 構成図",
+        "selector": [
+          {
+            "filenamePattern": "*.awsarch.yaml"
+          },
+          {
+            "filenamePattern": "*.awsdiagram.json"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "commands": [
+      {
+        "command": "zuform.newDiagram",
+        "title": "Zuform: 新しい構成図を作成"
+      }
+    ]
+  },
+  "scripts": {
+    "copy-media": "node copy-media.mjs",
+    "build": "npm run copy-media && node build.mjs",
+    "watch": "npm run copy-media && node build.mjs --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.0"
+  }
+}

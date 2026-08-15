@@ -14,8 +14,9 @@ OSS公開に向けたバックログ。優先度は 高 / 中 / 低 / 研究 の
 
 - [x] **名称変更**: 「AWS Builder」はAWS商標をプロダクト名に含むため公開前に改名 → **Zuform**（図(zu)×form）に決定・適用済み
 - [ ] **UIの英語化（i18n）**: UI文字列の辞書化 + 言語切替。生成コード内の日本語コメントの扱いは要検討（ロケール別コメント or 英語固定）
-- [ ] CONTRIBUTING.md（サービス追加手順はREADMEに記載済み）、Issue/PRテンプレート
+- [x] CONTRIBUTING.md（サービス追加手順はREADMEに記載済み）、Issue/PRテンプレート
 - [ ] GitHub Pagesでのライブデモ公開
+  - リポジトリはprivate運用中のため保留。publicに切り替えたら `actions/configure-pages` + `actions/upload-pages-artifact` + `actions/deploy-pages` のworkflowを追加するだけ（vite buildの `dist/` を配信、`base: './'` 設定済みなので追加設定不要）
 
 ## 中: サービス拡充
 

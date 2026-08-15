@@ -1,0 +1,45 @@
+name: AWSサービス対応リクエスト
+description: パレットにない新しいAWSサービスの対応を提案する
+title: "[Service] "
+labels:
+  - enhancement
+  - new-service
+body:
+  - type: markdown
+    attributes:
+      value: |
+        新しいAWSサービス対応の提案ありがとうございます。対応の要否や設計方針の検討に使うので、できるだけ具体的に書いてください。
+  - type: input
+    id: service-name
+    attributes:
+      label: サービス名
+      description: 追加してほしいAWSサービス名を書いてください。
+      placeholder: 例) Application Load Balancer (ALB)
+    validations:
+      required: true
+  - type: textarea
+    id: connections
+    attributes:
+      label: 想定する接続関係
+      description: どのサービスと矢印でつなぎたいか（つなぐ方向も含めて）を書いてください。
+      placeholder: |
+        - ALB → EC2（ターゲットグループへの登録）
+        - ALB → ECS（同上、コンテナ向け）
+        - CloudFront → ALB（オリジンとして接続）
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: ユースケース
+      description: どんな構成・目的でこのサービスを使いたいか教えてください。
+      placeholder: 例) EC2複数台を負荷分散したいWebサービス構成で使いたい
+    validations:
+      required: true
+  - type: textarea
+    id: additional
+    attributes:
+      label: 補足情報
+      description: 参考になりそうな構成例や、対応時に気をつけてほしい点があれば記入してください。
+    validations:
+      required: false

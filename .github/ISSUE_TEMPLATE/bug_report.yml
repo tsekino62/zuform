@@ -1,0 +1,68 @@
+name: バグ報告
+description: 生成コードの誤りやUI・VSCode拡張の不具合を報告する
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        バグ報告ありがとうございます。以下の項目をできるだけ詳しく記入してください。
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 再現手順
+      description: 何をどの順番で行うと問題が発生するか、手順を箇条書きで書いてください。
+      placeholder: |
+        1. パレットから Lambda と SQS をキャンバスに配置する
+        2. SQS → Lambda の矢印を接続する
+        3. 「全環境ZIP」でダウンロードする
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待動作
+      description: 本来どうなるべきだったかを書いてください。
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の動作
+      description: 実際に起きたことを書いてください。エラーメッセージがあれば貼り付けてください。
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: 環境
+      description: 問題が発生した環境を選んでください。
+      options:
+        - ブラウザ（Web版）
+        - VSCode拡張
+        - 両方
+    validations:
+      required: true
+  - type: input
+    id: deno-version
+    attributes:
+      label: Denoバージョン（開発環境で発生した場合）
+      placeholder: "deno --version の出力（例: deno 2.1.4）"
+    validations:
+      required: false
+  - type: textarea
+    id: arch-file
+    attributes:
+      label: アーキテクチャ定義ファイル（.awsarch.yaml）の内容
+      description: 可能であれば、問題が発生した図の `*.awsarch.yaml` の内容を貼り付けてください（個人情報や機密情報が含まれていないことを確認してください）。
+      render: yaml
+    validations:
+      required: false
+  - type: textarea
+    id: additional
+    attributes:
+      label: 補足情報
+      description: スクリーンショットや、その他参考になりそうな情報があれば記入してください。
+    validations:
+      required: false

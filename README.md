@@ -171,6 +171,8 @@ src/
 3. `src/aws/icons.ts` に公式アイコンを追加
 4. `src/aws/generator_test.ts` にテストケースを追加して `deno task test`
 
+詳しい手順やPRの前に確認すべきことは [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
+
 ## CI
 
 GitHub Actions（[.github/workflows/ci.yml](.github/workflows/ci.yml)）で以下を検証します:
